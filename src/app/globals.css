@@ -1,24 +1,166 @@
 @import "tailwindcss";
 
+/* ───────────────────────────────────────────────────────────
+   Sous — Design Tokens
+   "The Quiet Kitchen": warmth through material, not effects.
+   ─────────────────────────────────────────────────────────── */
+
 :root {
-  --background: #0a0a0b;
-  --foreground: #f5efe4;
-  --sous-amber: #f5b544;
-  --sous-copper: #c97a1b;
-  --sous-cream: #fff7e6;
+  /* Palette — warm neutrals, not generic dark-mode */
+  --bg-base: #111110;
+  --bg-raised: #1a1918;
+  --bg-inset: #0d0d0c;
+  --bg-hover: #1f1e1c;
+  --bg-active: #252422;
+
+  /* Text hierarchy */
+  --text-primary: #e8e2d6;
+  --text-secondary: #a09888;
+  --text-tertiary: #6b6258;
+  --text-inverse: #111110;
+
+  /* Brand — copper cookware, not neon */
+  --amber: #d4952b;
+  --amber-hover: #e0a53d;
+  --amber-muted: #d4952b33;
+  --amber-text: #e8b35a;
+  --copper: #b07830;
+  --copper-muted: #b0783022;
+
+  /* Semantic */
+  --success: #3d9a5f;
+  --success-muted: #3d9a5f1a;
+  --error: #c45252;
+  --error-muted: #c452521a;
+  --warning: #c4933a;
+  --warning-muted: #c4933a1a;
+
+  /* Surfaces & borders */
+  --border: #2a2826;
+  --border-subtle: #1f1e1c;
+  --border-focus: var(--amber);
+  --ring-focus: 0 0 0 2px var(--bg-base), 0 0 0 4px var(--amber);
+
+  /* Spacing scale (4px base) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Radii — restrained, not bubbly */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--bg-base);
+  --color-foreground: var(--text-primary);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
+/* ─── Base ─────────────────────────────────────────────── */
+
 body {
-  background:
-    radial-gradient(1200px 400px at 20% -10%, rgba(245, 181, 68, 0.12), transparent),
-    var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  font-feature-settings: "ss01", "ss02", "cv01";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ─── Focus — visible, accessible ──────────────────────── */
+
+*:focus-visible {
+  outline: none;
+  box-shadow: var(--ring-focus);
+  border-radius: var(--radius-sm);
+}
+
+/* ─── Selection ────────────────────────────────────────── */
+
+::selection {
+  background: var(--amber-muted);
+  color: var(--text-primary);
+}
+
+/* ─── Scrollbars — quiet, not invisible ────────────────── */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+/* ─── Animations — purposeful, not decorative ──────────── */
+
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.06; }
+  50% { opacity: 0.12; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes gentle-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.animate-skeleton {
+  animation: skeleton-pulse 1.8s ease-in-out infinite;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+.animate-gentle-pulse {
+  animation: gentle-pulse 2s ease-in-out infinite;
+}
+
+/* ─── Utility classes ──────────────────────────────────── */
+
+.surface-raised {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.surface-inset {
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.text-secondary {
+  color: var(--text-secondary);
+}
+
+.text-tertiary {
+  color: var(--text-tertiary);
 }

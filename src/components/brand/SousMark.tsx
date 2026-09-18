@@ -11,11 +11,11 @@ export function SousMark({
   return (
     <Image
       src="/brand/sous-logo.svg"
-      alt="Sous — chef hat over cookie"
+      alt="Sous"
       width={size}
       height={size}
       priority
-      className={cn("rounded-xl", className)}
+      className={cn(className)}
     />
   );
 }

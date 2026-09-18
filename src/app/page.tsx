@@ -8,21 +8,20 @@ export default function Home() {
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
-      <main className="mx-auto grid w-full max-w-6xl flex-1 gap-4 p-6 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="flex min-h-[480px] flex-col gap-4">
+
+      <main className="mx-auto flex w-full max-w-5xl flex-1 gap-0 lg:gap-px">
+        {/* Context rail — compact, secondary */}
+        <aside className="hidden w-72 shrink-0 flex-col gap-px overflow-y-auto border-r border-[var(--border-subtle)] lg:flex">
+          <PortfolioOverview />
+          <ActivityFeed />
+        </aside>
+
+        {/* Chat — the product */}
+        <div className="flex min-w-0 flex-1 flex-col">
           <ChatPanel />
           <TxStatusCard />
         </div>
-        <div className="flex flex-col gap-4">
-          <PortfolioOverview />
-          <ActivityFeed />
-        </div>
       </main>
-      <footer className="border-t border-white/10 px-6 py-4 text-xs text-white/40">
-        Sous v0 — your sous-chef for Cookie Chain. RPC: rpc.cookiescan.io ·
-        Explorer: cookiescan.io · Swaps: Cookiebox + Candy Shop · AI:
-        cookie-mcp (external-signer). Yes, Chef!
-      </footer>
     </div>
   );
 }

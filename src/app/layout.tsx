@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Sous — Your sous-chef for Cookie Chain",
   description:
-    "Sous preps, tastes, and plates your Cookie Chain moves: quotes, swaps, stake, LPs, bridge. Nightly + Cookiebox + DAS + cookie-mcp. Yes, Chef!",
+    "Conversational trading on Cookie Chain. Quotes, swaps, staking, bridging — all through natural language. Powered by Nightly + cookie-mcp.",
   icons: { icon: "/brand/sous-logo.svg" },
 };
 
@@ -29,11 +29,21 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full`}
     >
-      <body className="min-h-full flex flex-col bg-[#0a0a0b] text-white">
+      <body className="min-h-full flex flex-col">
         <WalletProviders>{children}</WalletProviders>
-        <Toaster richColors position="bottom-right" />
+        <Toaster
+          position="bottom-right"
+          toastOptions={{
+            style: {
+              background: "var(--bg-raised)",
+              border: "1px solid var(--border)",
+              color: "var(--text-primary)",
+              fontSize: "13px",
+            },
+          }}
+        />
       </body>
     </html>
   );

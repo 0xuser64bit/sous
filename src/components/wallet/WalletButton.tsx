@@ -5,45 +5,56 @@ import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { shortAddr } from "@/lib/utils/format";
 
 /**
- * Bounty-required: wallet connection + display connected address
- * + clear connect/disconnect + copy address.
+ * Wallet connection/display. Clean, compact, no candy colors.
  */
 export function WalletButton() {
-  const { publicKey, connected, disconnect, wallet } = useWallet();
+  const { publicKey, connected, disconnect } = useWallet();
   const { setVisible } = useWalletModal();
 
   if (!connected || !publicKey) {
     return (
       <button
         onClick={() => setVisible(true)}
-        className="rounded-full bg-amber-400 px-5 py-2 text-sm font-semibold text-black hover:bg-amber-300"
+        className="rounded-md px-3 py-1.5 text-xs font-medium transition-colors hover:opacity-80"
+        style={{
+          background: "var(--amber)",
+          color: "var(--text-inverse)",
+        }}
       >
-        Connect Nightly
+        Connect
       </button>
     );
   }
 
   const addr = publicKey.toBase58();
   return (
-    <div className="flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5">
+    <div className="flex items-center gap-1.5">
       <span
-        className="h-2 w-2 rounded-full bg-emerald-400"
-        title={wallet?.adapter.name ?? "connected"}
+        className="h-1.5 w-1.5 rounded-full"
+        style={{ background: "var(--success)" }}
       />
-      <span className="font-mono text-sm" title={addr}>
+      <span
+        className="font-mono text-xs"
+        style={{ color: "var(--text-secondary)" }}
+        title={addr}
+      >
         {shortAddr(addr)}
       </span>
       <button
-        className="text-xs text-white/60 hover:text-white"
+        className="ml-1 text-[11px] transition-opacity hover:opacity-70"
+        style={{ color: "var(--text-tertiary)" }}
         onClick={() => void navigator.clipboard.writeText(addr)}
+        title="Copy address"
       >
-        Copy
+        ⌘
       </button>
       <button
-        className="text-xs text-white/60 hover:text-white"
+        className="text-[11px] transition-opacity hover:opacity-70"
+        style={{ color: "var(--text-tertiary)" }}
         onClick={() => void disconnect()}
+        title="Disconnect"
       >
-        Disconnect
+        ×
       </button>
     </div>
   );

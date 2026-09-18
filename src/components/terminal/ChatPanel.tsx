@@ -1,20 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { callMcp, isNeedsSignature } from "@/lib/mcp/client";
 import { usePilotStore } from "@/lib/store/usePilotStore";
 import { signAndSubmitNeedsSignature } from "@/lib/tx/signAndSend";
 
 /**
- * Minimal chat shell. Agent logic lives server-side (cookie-mcp).
- * This panel only: sends prompt -> displays quote/plan -> signs via Nightly if needed.
+ * The core product surface. Not a card — the workspace itself.
+ * User types intent → Sous quotes → user signs → confirmed.
  */
 export function ChatPanel() {
   const { publicKey, signTransaction } = useWallet();
   const { messages, push, setPhase, setSignature, setError } = usePilotStore();
-  const [input, setInput] = useState("Quote 10 COOK -> bCOOK");
+  const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages]);
 
   async function onSend() {
     if (!input.trim() || busy) return;
@@ -23,8 +30,6 @@ export function ChatPanel() {
     push({ role: "user", text: input });
     setPhase("quoting");
     try {
-      // Step 1: read-only demo — chain health + echo.
-      // Real agent loop (planner -> get_quote -> trade) lands in TASK 02.
       const health = await callMcp({
         tool: "chain_health",
         wallet: publicKey?.toBase58(),
@@ -49,7 +54,7 @@ export function ChatPanel() {
       const msg = e instanceof Error ? e.message : "Unknown error";
       setError(msg);
       setPhase("failed");
-      push({ role: "system", text: `Error: ${msg}` });
+      push({ role: "system", text: msg });
     } finally {
       setBusy(false);
       setInput("");
@@ -57,40 +62,101 @@ export function ChatPanel() {
   }
 
   return (
-    <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.03]">
-      <div className="flex-1 space-y-3 overflow-auto p-4">
-        {messages.map((m) => (
-          <div
-            key={m.id}
-            className={`max-w-[90%] rounded-xl px-3 py-2 text-sm ${
-              m.role === "user"
-                ? "ml-auto bg-amber-400 text-black"
-                : m.role === "system"
-                  ? "bg-red-500/15 text-red-200"
-                  : "bg-white/10"
-            }`}
-          >
-            {m.text}
+    <div className="flex flex-1 flex-col">
+      {/* Messages */}
+      <div
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto px-4 py-4"
+      >
+        {messages.length === 0 ? (
+          <div className="flex h-full items-center justify-center">
+            <p className="text-sm" style={{ color: "var(--text-tertiary)" }}>
+              Connect a wallet and start cooking.
+            </p>
           </div>
-        ))}
+        ) : (
+          <div className="mx-auto flex max-w-2xl flex-col gap-3">
+            {messages.map((m) => (
+              <div
+                key={m.id}
+                className={`animate-fade-in text-[13px] leading-relaxed ${
+                  m.role === "user"
+                    ? "ml-auto max-w-[80%]"
+                    : "mr-auto max-w-[85%]"
+                }`}
+              >
+                {m.role === "user" ? (
+                  <div
+                    className="rounded-md px-3 py-2"
+                    style={{
+                      background: "var(--amber-muted)",
+                      color: "var(--text-primary)",
+                    }}
+                  >
+                    {m.text}
+                  </div>
+                ) : m.role === "system" ? (
+                  <div
+                    className="rounded-md px-3 py-2 font-mono text-xs"
+                    style={{
+                      background: "var(--error-muted)",
+                      color: "var(--error)",
+                    }}
+                  >
+                    {m.text}
+                  </div>
+                ) : (
+                  <div
+                    className="py-1"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    {m.text}
+                  </div>
+                )}
+              </div>
+            ))}
+            {busy && (
+              <div
+                className="animate-fade-in mr-auto text-[13px]"
+                style={{ color: "var(--text-tertiary)" }}
+              >
+                <span className="animate-gentle-pulse inline-block">
+                  Cooking…
+                </span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
-      <div className="flex gap-2 border-t border-white/10 p-3">
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && void onSend()}
-          placeholder={
-            publicKey ? "Ask Sous… (e.g. quote 10 COOK → bCOOK)" : "Connect Nightly to start cooking…"
-          }
-          className="flex-1 rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none placeholder:text-white/30 focus:border-amber-400/60"
-        />
-        <button
-          onClick={() => void onSend()}
-          disabled={busy}
-          className="rounded-xl bg-amber-400 px-4 py-2 text-sm font-semibold text-black disabled:opacity-50"
-        >
-          {busy ? "…" : "Send"}
-        </button>
+
+      {/* Input */}
+      <div className="border-t border-[var(--border-subtle)] px-4 py-3">
+        <div className="mx-auto flex max-w-2xl gap-2">
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && void onSend()}
+            placeholder={
+              publicKey
+                ? "Quote 10 COOK → bCOOK…"
+                : "Connect wallet to start"
+            }
+            disabled={!publicKey || busy}
+            className="flex-1 rounded-md border border-[var(--border)] bg-[var(--bg-inset)] px-3 py-2 text-[13px] outline-none transition-colors placeholder:text-[var(--text-tertiary)] focus:border-[var(--amber)] disabled:opacity-40"
+            style={{ color: "var(--text-primary)" }}
+          />
+          <button
+            onClick={() => void onSend()}
+            disabled={busy || !input.trim()}
+            className="rounded-md px-4 py-2 text-[13px] font-medium transition-colors disabled:opacity-30"
+            style={{
+              background: "var(--amber)",
+              color: "var(--text-inverse)",
+            }}
+          >
+            Send
+          </button>
+        </div>
       </div>
     </div>
   );
