@@ -1,61 +1,63 @@
 @import "tailwindcss";
 
-/* ───────────────────────────────────────────────────────────
-   Sous — Design Tokens
-   "The Quiet Kitchen": warmth through material, not effects.
-   ─────────────────────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────
+   Sous — "The Pass"
+   A kitchen ticket rail, not a dashboard. One dark room, one
+   warm light (copper), paper tickets for things that cost money.
+   Flat surfaces, hairline borders, no gradients, no glass,
+   no shadows larger than a thumbnail.
+   ───────────────────────────────────────────────────────────── */
 
 :root {
-  /* Palette — warm neutrals, not generic dark-mode */
-  --bg-base: #111110;
-  --bg-raised: #1a1918;
-  --bg-inset: #0d0d0c;
-  --bg-hover: #1f1e1c;
-  --bg-active: #252422;
+  /* Room — warm near-blacks */
+  --bg-base: #141210;
+  --bg-raised: #1b1815;
+  --bg-inset: #0e0c0a;
+  --bg-hover: #211d19;
+  --bg-active: #272220;
 
-  /* Text hierarchy */
-  --text-primary: #e8e2d6;
-  --text-secondary: #a09888;
-  --text-tertiary: #6b6258;
-  --text-inverse: #111110;
+  /* Paper — order slips that carry money */
+  --paper: #ece1cb;
+  --paper-dim: #d9cbae;
+  --paper-faint: #c4b493;
+  --ink: #221a10;
+  --ink-soft: #57482f;
+  --ink-faint: #847252;
 
-  /* Brand — copper cookware, not neon */
-  --amber: #d4952b;
-  --amber-hover: #e0a53d;
-  --amber-muted: #d4952b33;
-  --amber-text: #e8b35a;
-  --copper: #b07830;
-  --copper-muted: #b0783022;
+  /* Text on dark */
+  --text-primary: #e9e1d2;
+  --text-secondary: #a89a83;
+  --text-tertiary: #6e6350;
 
-  /* Semantic */
-  --success: #3d9a5f;
-  --success-muted: #3d9a5f1a;
-  --error: #c45252;
-  --error-muted: #c452521a;
-  --warning: #c4933a;
-  --warning-muted: #c4933a1a;
+  /* Copper — the single accent. Fire, focus, live things. */
+  --copper: #c97a1b;
+  --copper-bright: #e09a3c;
+  --copper-deep: #8a5210;
+  --copper-wash: #c97a1b1f;
+  --copper-line: #c97a1b55;
 
-  /* Surfaces & borders */
-  --border: #2a2826;
-  --border-subtle: #1f1e1c;
-  --border-focus: var(--amber);
-  --ring-focus: 0 0 0 2px var(--bg-base), 0 0 0 4px var(--amber);
+  /* Semantic — muted, never neon */
+  --success: #63a07c;
+  --success-dim: #63a07c22;
+  --error: #c46a5a;
+  --error-dim: #c46a5a1c;
+  --warning: #c9a13f;
+  --warning-dim: #c9a13f1c;
 
-  /* Spacing scale (4px base) */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 20px;
-  --space-6: 24px;
-  --space-8: 32px;
-  --space-10: 40px;
-  --space-12: 48px;
+  /* Hairlines */
+  --border: #2b251e;
+  --border-subtle: #201b15;
+  --border-strong: #3a3227;
 
-  /* Radii — restrained, not bubbly */
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
+  --ring-focus: 0 0 0 2px var(--bg-base), 0 0 0 4px var(--copper);
+
+  /* Radii — restrained. Tickets are nearly square, like paper. */
+  --radius-sm: 3px;
+  --radius-md: 5px;
+  --radius-lg: 7px;
+
+  /* Type */
+  --font-display: var(--font-fraunces), Georgia, serif;
 }
 
 @theme inline {
@@ -63,20 +65,35 @@
   --color-foreground: var(--text-primary);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-display);
 }
 
-/* ─── Base ─────────────────────────────────────────────── */
+/* ─── Base ─────────────────────────────────────────────────── */
+
+html {
+  background: var(--bg-base);
+}
 
 body {
   background: var(--bg-base);
   color: var(--text-primary);
   font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
-  font-feature-settings: "ss01", "ss02", "cv01";
+  font-feature-settings: "ss01", "cv01";
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
-/* ─── Focus — visible, accessible ──────────────────────── */
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* ─── Focus — always visible ───────────────────────────────── */
 
 *:focus-visible {
   outline: none;
@@ -84,14 +101,14 @@ body {
   border-radius: var(--radius-sm);
 }
 
-/* ─── Selection ────────────────────────────────────────── */
+/* ─── Selection ────────────────────────────────────────────── */
 
 ::selection {
-  background: var(--amber-muted);
-  color: var(--text-primary);
+  background: var(--copper-deep);
+  color: #fff7e8;
 }
 
-/* ─── Scrollbars — quiet, not invisible ────────────────── */
+/* ─── Scrollbars — quiet ───────────────────────────────────── */
 
 ::-webkit-scrollbar {
   width: 6px;
@@ -101,66 +118,109 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
+  background: var(--border-strong);
   border-radius: 3px;
 }
-::-webkit-scrollbar-thumb:hover {
-  background: var(--text-tertiary);
-}
-
-/* Firefox */
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
+  scrollbar-color: var(--border-strong) transparent;
 }
 
-/* ─── Animations — purposeful, not decorative ──────────── */
+/* ─── Motion — one entrance, one pulse, both killable ──────── */
 
-@keyframes skeleton-pulse {
-  0%, 100% { opacity: 0.06; }
-  50% { opacity: 0.12; }
+@keyframes ticket-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-@keyframes fade-in {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
 }
 
-@keyframes gentle-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+.animate-ticket-in {
+  animation: ticket-in 0.18s ease-out both;
 }
 
-.animate-skeleton {
-  animation: skeleton-pulse 1.8s ease-in-out infinite;
+.animate-live {
+  animation: live-pulse 2.2s ease-in-out infinite;
 }
 
-.animate-fade-in {
-  animation: fade-in 0.2s ease-out;
+@media (prefers-reduced-motion: reduce) {
+  .animate-ticket-in,
+  .animate-live {
+    animation: none;
+  }
 }
 
-.animate-gentle-pulse {
-  animation: gentle-pulse 2s ease-in-out infinite;
+/* ─── Ticket perforation — the tear-off edge ───────────────── */
+
+.ticket-perf {
+  --perf: var(--bg-base);
+  background-image: radial-gradient(circle at 50% 50%, var(--perf) 2.2px, transparent 2.6px);
+  background-size: 10px 10px;
+  background-repeat: repeat-x;
+  background-position: center;
+  height: 6px;
 }
 
-/* ─── Utility classes ──────────────────────────────────── */
-
-.surface-raised {
-  background: var(--bg-raised);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+/* Dashed leader between label and value on paper */
+.leader {
+  background-image: linear-gradient(to right, var(--ink-faint) 1px, transparent 1px);
+  background-size: 5px 1px;
+  background-repeat: repeat-x;
+  background-position: bottom;
+  opacity: 0.55;
 }
 
-.surface-inset {
-  background: var(--bg-inset);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-}
+/* ─── Wallet-adapter modal — pull it into the kitchen ──────── */
 
-.text-secondary {
-  color: var(--text-secondary);
+.wallet-adapter-modal-wrapper {
+  background: rgba(14, 12, 10, 0.8) !important;
 }
-
-.text-tertiary {
-  color: var(--text-tertiary);
+.wallet-adapter-modal-container {
+  background: var(--bg-raised) !important;
+  border: 1px solid var(--border-strong) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: none !important;
+}
+.wallet-adapter-modal-title {
+  color: var(--text-primary) !important;
+  font-family: var(--font-geist-sans), system-ui, sans-serif !important;
+  font-size: 13px !important;
+}
+.wallet-adapter-modal-list-more {
+  color: var(--text-secondary) !important;
+  font-size: 12px !important;
+}
+.wallet-adapter-button {
+  background: var(--bg-inset) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-md) !important;
+  color: var(--text-primary) !important;
+  font-family: var(--font-geist-sans), system-ui, sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+}
+.wallet-adapter-button:hover {
+  background: var(--bg-hover) !important;
+  border-color: var(--border-strong) !important;
+}
+.wallet-adapter-button:not([disabled]):hover {
+  background: var(--bg-hover) !important;
+}
+.wallet-adapter-modal-close-btn {
+  background: transparent !important;
+  color: var(--text-tertiary) !important;
 }

@@ -9,11 +9,37 @@ export type TxPhase =
   | "confirmed"
   | "failed";
 
+export type QuoteState = "proposed" | "firing" | "fired" | "dismissed" | "failed";
+
+export type QuoteData = {
+  amount: number;
+  from: string;
+  to: string;
+  outAmount?: string;
+  venue?: string;
+  impact?: string;
+  state: QuoteState;
+  note?: string;
+};
+
+export type TableData = {
+  title: string;
+  subtitle?: string;
+  rows: { label: string; value: string }[];
+  more?: number;
+};
+
 export type ChatMsg = {
   id: string;
   role: "user" | "assistant" | "system";
   text: string;
   ts: number;
+  /** Ticket-rail number, assigned to user orders. */
+  ticketNo?: number;
+  /** Structured quote attached to an assistant message. */
+  quote?: QuoteData;
+  /** Ledger-style rows attached to an assistant message. */
+  table?: TableData;
   signature?: string;
 };
 
@@ -22,31 +48,52 @@ type PilotState = {
   txPhase: TxPhase;
   lastSignature: string | null;
   lastError: string | null;
-  push: (m: Omit<ChatMsg, "id" | "ts">) => void;
+  ticketSeq: number;
+  push: (m: Omit<ChatMsg, "id" | "ts">) => string;
+  updateQuote: (id: string, patch: Partial<QuoteData>) => void;
   setPhase: (p: TxPhase) => void;
   setSignature: (s: string | null) => void;
   setError: (e: string | null) => void;
   resetTx: () => void;
 };
 
+function makeId(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 export const usePilotStore = create<PilotState>((set) => ({
   messages: [
     {
       id: "welcome",
       role: "assistant",
-      text: "Yes, Chef! I'm Sous, your sous-chef for Cookie Chain. Connect Nightly, then ask e.g. 'Quote 10 COOK -> bCOOK'.",
+      text: "Yes, Chef! I'm Sous. Tell me what to fire — a swap, a stake, your balances — and I'll quote it, then ask for your signature in Nightly. Nothing moves without your hand.",
       ts: Date.now(),
     },
   ],
   txPhase: "idle",
   lastSignature: null,
   lastError: null,
-  push: (m) =>
+  ticketSeq: 1,
+  push: (m) => {
+    const id = makeId();
+    set((s) => {
+      const ticketNo =
+        m.role === "user" && m.ticketNo === undefined ? s.ticketSeq : m.ticketNo;
+      return {
+        messages: [
+          ...s.messages,
+          { ...m, id, ts: Date.now(), ticketNo },
+        ].slice(-100),
+        ticketSeq: m.role === "user" && m.ticketNo === undefined ? s.ticketSeq + 1 : s.ticketSeq,
+      };
+    });
+    return id;
+  },
+  updateQuote: (id, patch) =>
     set((s) => ({
-      messages: [
-        ...s.messages,
-        { ...m, id: `${Date.now()}-${Math.random()}`, ts: Date.now() },
-      ].slice(-100),
+      messages: s.messages.map((m) =>
+        m.id === id && m.quote ? { ...m, quote: { ...m.quote, ...patch } } : m,
+      ),
     })),
   setPhase: (txPhase) => set({ txPhase }),
   setSignature: (lastSignature) => set({ lastSignature }),

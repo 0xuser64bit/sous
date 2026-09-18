@@ -3,19 +3,16 @@
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useQuery } from "@tanstack/react-query";
 import { callMcp } from "@/lib/mcp/client";
-import { fmtCook, shortAddr } from "@/lib/utils/format";
+import { unwrapMcp, toRows } from "@/lib/mcp/shapes";
+import { shortAddr } from "@/lib/utils/format";
+import { addressUrl } from "@/lib/chain/explorer";
+import { Section } from "@/components/layout/Section";
+import { DataRows, RowsSkeleton, RowsError, sidecarHint } from "@/components/layout/DataRows";
 
-function Skeleton() {
-  return (
-    <div className="space-y-2 px-4 py-3">
-      <div className="h-3 w-20 rounded animate-skeleton" style={{ background: "var(--border)" }} />
-      <div className="h-3 w-32 rounded animate-skeleton" style={{ background: "var(--border)" }} />
-      <div className="h-3 w-24 rounded animate-skeleton" style={{ background: "var(--border)" }} />
-    </div>
-  );
-}
-
-/** Portfolio sidebar section. Compact, structured, not a JSON dump. */
+/**
+ * The pantry — what the kitchen holds. Balances for this wallet,
+ * bCOOK staking for the house. Reads only; firing happens at the pass.
+ */
 export function PortfolioOverview() {
   const { publicKey } = useWallet();
   const wallet = publicKey?.toBase58();
@@ -24,133 +21,110 @@ export function PortfolioOverview() {
     queryKey: ["balance", wallet],
     queryFn: () => callMcp({ tool: "get_balance", wallet, args: {} }),
     enabled: Boolean(wallet),
+    retry: 1,
   });
   const stake = useQuery({
     queryKey: ["stake_info"],
     queryFn: () => callMcp({ tool: "stake_info", args: {} }),
+    retry: 1,
+    staleTime: 30_000,
   });
 
   if (!wallet) {
     return (
-      <div className="px-4 py-4">
-        <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>
-          Connect wallet to see balances and staking info.
+      <Section label="Pantry">
+        <p className="text-[12.5px] leading-relaxed" style={{ color: "var(--text-tertiary)" }}>
+          Hang your wallet on the hook — connect Nightly to stock the
+          pantry with balances and staking.
         </p>
-      </div>
+      </Section>
     );
   }
+
+  const balRows = bal.data ? toRows(unwrapMcp(bal.data), 8) : null;
+  const stakeRows = stake.data ? toRows(unwrapMcp(stake.data), 6) : null;
 
   return (
     <div className="flex flex-col">
-      {/* Wallet address */}
-      <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-4 py-3">
+      {/* Wallet shelf-mark */}
+      <div className="flex items-center gap-2 px-4 pb-1 pt-4">
         <span
-          className="h-1.5 w-1.5 rounded-full"
+          aria-hidden
+          className="inline-block h-1.5 w-1.5 rounded-full"
           style={{ background: "var(--success)" }}
         />
-        <span className="font-mono text-xs" style={{ color: "var(--text-secondary)" }}>
-          {shortAddr(wallet, 6)}
-        </span>
+        <a
+          href={addressUrl(wallet)}
+          target="_blank"
+          rel="noreferrer"
+          className="font-mono text-[12px] tnum transition-opacity hover:opacity-70"
+          style={{ color: "var(--text-secondary)" }}
+          title={wallet}
+        >
+          {shortAddr(wallet, 6)} ↗
+        </a>
       </div>
 
-      {/* Balances */}
-      <div className="px-4 py-3">
-        <div
-          className="mb-2 text-[10px] font-medium uppercase tracking-wider"
-          style={{ color: "var(--text-tertiary)" }}
-        >
-          Balances
-        </div>
+      <Section
+        label="Balances"
+        action={
+          <RefreshButton onClick={() => void bal.refetch()} spinning={bal.isFetching} label="Refresh balances" />
+        }
+      >
         {bal.isPending ? (
-          <Skeleton />
-        ) : bal.data && typeof bal.data === "object" ? (
-          <BalanceList data={bal.data as Record<string, unknown>} />
+          <RowsSkeleton lines={3} />
+        ) : bal.isError ? (
+          <RowsError message={sidecarHint(bal.error.message)} onRetry={() => void bal.refetch()} />
+        ) : balRows ? (
+          <DataRows rows={balRows.rows} more={balRows.more} />
         ) : (
-          <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>
-            No balance data
-          </p>
+          <DataRows rows={[]} />
         )}
-      </div>
+      </Section>
 
-      {/* Staking */}
-      <div className="border-t border-[var(--border-subtle)] px-4 py-3">
-        <div
-          className="mb-2 text-[10px] font-medium uppercase tracking-wider"
-          style={{ color: "var(--text-tertiary)" }}
+      <div style={{ borderTop: "1px solid var(--border-subtle)" }}>
+        <Section
+          label="bCOOK Staking"
+          action={
+            <RefreshButton onClick={() => void stake.refetch()} spinning={stake.isFetching} label="Refresh staking" />
+          }
         >
-          bCOOK Staking
-        </div>
-        {stake.isPending ? (
-          <Skeleton />
-        ) : stake.data && typeof stake.data === "object" ? (
-          <StakeInfo data={stake.data as Record<string, unknown>} />
-        ) : (
-          <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>
-            No staking data
-          </p>
-        )}
+          {stake.isPending ? (
+            <RowsSkeleton lines={3} />
+          ) : stake.isError ? (
+            <RowsError message={sidecarHint(stake.error.message)} onRetry={() => void stake.refetch()} />
+          ) : stakeRows ? (
+            <DataRows rows={stakeRows.rows} more={stakeRows.more} />
+          ) : (
+            <DataRows rows={[]} />
+          )}
+        </Section>
       </div>
     </div>
   );
 }
 
-function BalanceList({ data }: { data: Record<string, unknown> }) {
-  // Attempt to display structured data; fall back to key-value pairs
-  const entries = Object.entries(data).slice(0, 10);
-  if (entries.length === 0) {
-    return (
-      <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>
-        No balances found
-      </p>
-    );
-  }
+function RefreshButton({
+  onClick,
+  spinning,
+  label,
+}: {
+  onClick: () => void;
+  spinning: boolean;
+  label: string;
+}) {
   return (
-    <div className="space-y-1">
-      {entries.map(([key, val]) => (
-        <div
-          key={key}
-          className="flex items-baseline justify-between text-xs"
-        >
-          <span className="truncate font-mono" style={{ color: "var(--text-secondary)" }}>
-            {key}
-          </span>
-          <span className="ml-2 shrink-0 font-mono tabular-nums" style={{ color: "var(--text-primary)" }}>
-            {typeof val === "number"
-              ? fmtCook(val)
-              : String(val).slice(0, 20)}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function StakeInfo({ data }: { data: Record<string, unknown> }) {
-  const entries = Object.entries(data).slice(0, 6);
-  if (entries.length === 0) {
-    return (
-      <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>
-        No staking info
-      </p>
-    );
-  }
-  return (
-    <div className="space-y-1">
-      {entries.map(([key, val]) => (
-        <div
-          key={key}
-          className="flex items-baseline justify-between text-xs"
-        >
-          <span className="truncate" style={{ color: "var(--text-secondary)" }}>
-            {key.replace(/_/g, " ")}
-          </span>
-          <span className="ml-2 shrink-0 font-mono tabular-nums" style={{ color: "var(--text-primary)" }}>
-            {typeof val === "number"
-              ? val.toLocaleString(undefined, { maximumFractionDigits: 4 })
-              : String(val).slice(0, 20)}
-          </span>
-        </div>
-      ))}
-    </div>
+    <button
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className="font-mono text-[11px] transition-opacity hover:opacity-70 disabled:opacity-40"
+      style={{ color: "var(--text-tertiary)" }}
+      disabled={spinning}
+    >
+      <span aria-hidden className={spinning ? "animate-live inline-block" : "inline-block"}>
+        ↻
+      </span>
+    </button>
   );
 }
