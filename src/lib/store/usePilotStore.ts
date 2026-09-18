@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { McpTool } from "@/lib/mcp/client";
 
 export type TxPhase =
   | "idle"
@@ -11,10 +12,26 @@ export type TxPhase =
 
 export type QuoteState = "proposed" | "firing" | "fired" | "dismissed" | "failed";
 
+/** Every money move goes through a paper ticket, then the wallet. */
+export type OrderKind =
+  | "swap"
+  | "transfer"
+  | "limit"
+  | "stake"
+  | "unstake"
+  | "bridge";
+
 export type QuoteData = {
+  orderKind: OrderKind;
   amount: number;
   from: string;
   to: string;
+  /** Extra line on the ticket, e.g. limit price. */
+  detailLabel?: string;
+  detail?: string;
+  /** Tool + args the ticket fires (used when no cached payload exists). */
+  fireTool: McpTool;
+  fireArgs: Record<string, unknown>;
   outAmount?: string;
   venue?: string;
   impact?: string;

@@ -1,7 +1,16 @@
 "use client";
 
-import type { QuoteData } from "@/lib/store/usePilotStore";
+import type { OrderKind, QuoteData } from "@/lib/store/usePilotStore";
 import { fmtClock } from "@/lib/utils/format";
+
+const KIND_WORD: Record<OrderKind, string> = {
+  swap: "Tasting",
+  transfer: "Sending",
+  limit: "Standing order",
+  stake: "Staking",
+  unstake: "Unstaking",
+  bridge: "Bridging",
+};
 
 /**
  * The paper ticket. Pinned to the dark pass, cream stock, ink text —
@@ -23,7 +32,7 @@ export function QuoteTicket({
   onFire: (msgId: string) => void;
   onDismiss: (msgId: string) => void;
 }) {
-  const { amount, from, to, outAmount, venue, impact, state, note } = quote;
+  const { orderKind, amount, from, to, detailLabel, detail, outAmount, venue, impact, state, note } = quote;
   const dead = state === "fired" || state === "dismissed" || state === "failed";
 
   return (
@@ -35,7 +44,7 @@ export function QuoteTicket({
       {/* Header */}
       <div className="flex items-baseline justify-between gap-2 px-4 pt-3">
         <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--ink-soft)" }}>
-          Order{ticketNo ? ` No. ${String(ticketNo).padStart(3, "0")}` : ""} · Tasting
+          Order{ticketNo ? ` No. ${String(ticketNo).padStart(3, "0")}` : ""} · {KIND_WORD[orderKind] ?? "Tasting"}
         </span>
         <span className="font-mono text-[10px] tnum" style={{ color: "var(--ink-faint)" }}>
           {fmtClock(ts)}
@@ -53,6 +62,7 @@ export function QuoteTicket({
       <dl className="space-y-1.5 px-4 py-3 text-[12.5px]">
         <Line label="You fire" value={`${amount} ${from}`} strong />
         <Line label="You receive" value={outAmount ?? "—"} strong />
+        {detail && detailLabel && <Line label={detailLabel} value={detail} />}
         <Line label="Venue" value={venue ?? "best of Cookiebox · Candy Shop"} />
         {impact && <Line label="Price impact" value={impact} />}
         <Line label="Est. fee" value="≈ 0.000005 COOK" />

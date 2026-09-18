@@ -3,6 +3,11 @@ export function shortAddr(addr: string, n = 4): string {
   return `${addr.slice(0, n)}…${addr.slice(-n)}`;
 }
 
+/** Base58 address-shaped (32–44 chars, no 0/O/I/l). Used to linkify values. */
+export function isAddressLike(v: string): boolean {
+  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(v.trim());
+}
+
 export function fmtCook(lamportsLike: number | string, decimals = 9): string {
   const n = Number(lamportsLike) / 10 ** decimals;
   if (!Number.isFinite(n)) return "—";
