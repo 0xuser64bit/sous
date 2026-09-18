@@ -39,6 +39,7 @@ Health checks: `pnpm chain:health` (RPC slot) and `GET /api/health`.
 | `pnpm build` | production build (must pass for submission) |
 | `pnpm lint` | eslint |
 | `pnpm typecheck` | tsc --noEmit |
+| `pnpm test` | vitest unit suite (intent, shapes, tx, slot) |
 | `pnpm chain:health` | RPC slot check (pnpm-safe, no npm vars) |
 
 ## Architecture
@@ -46,10 +47,12 @@ Health checks: `pnpm chain:health` (RPC slot) and `GET /api/health`.
 See `docs/ARCHITECTURE.md`. TL;DR:
 
 - `src/lib/chain/` — RPC, program IDs, explorer links. Single source of truth.
-- `src/app/api/mcp` — proxy to `cookie-mcp` (external-signer). Browser sends `{tool, args}` + `x-cookie-wallet`. Gets data or `{status:'needs_signature', transactionBase64}`.
-- `src/lib/tx/signAndSend.ts` — Nightly signs base64, sends via Cookie RPC, confirms.
-- `src/components/terminal/` — chat + TxStatusCard (bounty-required feedback).
-- `src/components/dashboard/` — balances, bCOOK staking, pools/activity (DAS later).
+- `src/app/api/mcp` — proxy to `cookie-mcp` (external-signer). Browser sends `{tool, args}` + `x-cookie-wallet`. Gets data or `{status:'needs_signature', transactionBase64}` (envelope unwrapped client-side).
+- `src/app/api/tx/submit` — single on-chain write path. Relays signed bytes, confirms blockhash-aware, never retries expired quotes blindly.
+- `src/lib/intent.ts` — local intent parser (swap/send/stake/limit/bridge/names/search). No network, no guessing with money.
+- `src/lib/tx/` — Nightly signing (transaction + message paths), typed `TxError` (rejected/expired/failed), shared limit-cancel flow.
+- `src/components/terminal/` — chat pass, paper `QuoteTicket` per money move, `TxPass` stepper (bounty-required feedback).
+- `src/components/dashboard/` — pantry (balances, stake quick-fire, standing orders) + market (chain pulse, pool board, live throughput sparkline).
 - `src/components/brand/` — `SousMark` (chef-hat cookie SVG), `SousLoader` (Preheating/Tasting/Plating).
 
 ## Bounty fit
