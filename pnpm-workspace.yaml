@@ -1,0 +1,14 @@
+# pnpm v11 requires explicit allow/deny for postinstall build scripts.
+# These are all optional native/perf deps pulled via wallet adapters.
+# `false` = skip build, install succeeds offline-safe. Flip to `true`
+# only if you hit a runtime error demanding the native binding
+# (e.g. Ledger USB needs `usb: true`).
+allowBuilds:
+  '@stellar/stellar-sdk': false
+  blake-hash: false
+  bufferutil: false
+  protobufjs: false
+  tiny-secp256k1: false
+  unrs-resolver: false
+  usb: false
+  utf-8-validate: false

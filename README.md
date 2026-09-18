@@ -1,36 +1,72 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 👨‍🍳 Sous — Your sous-chef for Cookie Chain
 
-## Getting Started
+> Sous preps, tastes, and plates your Cookie Chain moves: quotes, swaps,
+> stake, LPs, bridge. Nightly + Cookiebox + DAS + cookie-mcp (wallet-signed).
+> Yes, Chef!
 
-First, run the development server:
+**Bounty:** Build a cApp on Cookie Chain. This repo is the entry.
+
+Name decided: **Sous** (sous-chef). Tagline: "Your sous-chef for Cookie Chain".
+Vibe: warm kitchen — chef's-hat cookie mark, amber/copper on dark, microcopy
+in kitchen voice (Preheating / Tasting / Plating / Yes, Chef!).
+
+## Quickstart (pnpm is the standard)
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+cp .env.example .env.local
+pnpm install
+# terminal 1: MCP in external-signer mode (no keys in app process)
+COOKIE_SIGNER=external npx -y cookie-mcp --http 8787
+# terminal 2: web app
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000 → Connect **Nightly** → ask `Quote 10 COOK -> bCOOK`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Health checks: `pnpm chain:health` (RPC slot) and `GET /api/health`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+> Why pnpm-only? Mixing npm + pnpm breaks installs. This repo standardizes on
+> pnpm (`packageManager: pnpm@11.24.0`). `package-lock.json` is removed on
+> purpose — do not reintroduce it. If `pnpm install` complains about
+> ignored build scripts, `pnpm-workspace.yaml > allowBuilds` already pins the
+> answer; don't hand-edit to placeholder strings.
 
-## Learn More
+## Scripts
 
-To learn more about Next.js, take a look at the following resources:
+| cmd | what |
+|---|---|
+| `pnpm dev` | Next.js dev |
+| `pnpm build` | production build (must pass for submission) |
+| `pnpm lint` | eslint |
+| `pnpm typecheck` | tsc --noEmit |
+| `pnpm chain:health` | RPC slot check (pnpm-safe, no npm vars) |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Architecture
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+See `docs/ARCHITECTURE.md`. TL;DR:
 
-## Deploy on Vercel
+- `src/lib/chain/` — RPC, program IDs, explorer links. Single source of truth.
+- `src/app/api/mcp` — proxy to `cookie-mcp` (external-signer). Browser sends `{tool, args}` + `x-cookie-wallet`. Gets data or `{status:'needs_signature', transactionBase64}`.
+- `src/lib/tx/signAndSend.ts` — Nightly signs base64, sends via Cookie RPC, confirms.
+- `src/components/terminal/` — chat + TxStatusCard (bounty-required feedback).
+- `src/components/dashboard/` — balances, bCOOK staking, pools/activity (DAS later).
+- `src/components/brand/` — `SousMark` (chef-hat cookie SVG), `SousLoader` (Preheating/Tasting/Plating).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Bounty fit
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+See `docs/BOUNTY.md` — required features checklist + optional integrations + demo script.
+
+## Env
+
+- `NEXT_PUBLIC_*` = public chain endpoints (safe).
+- `MCP_HTTP_URL` = server-only URL to cookie-mcp. Never hold `COOKIE_PRIVATE_KEY` in web process.
+
+## Deploy
+
+Vercel / Railway / Fly. Set env vars from `.env.example`. App is read-only until MCP URL is set; wallet signing is client-side via Nightly.
+
+## Submission (TODO)
+
+- [ ] Live URL
+- [ ] Program/token addresses used (list in README before submit)
+- [ ] X thread + Telegram share
