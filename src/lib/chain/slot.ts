@@ -3,9 +3,10 @@ import { pickKey } from "@/lib/utils/format";
 
 /**
  * Extract a displayable slot from a raw `chain_health` MCP response.
- * Handles the JSON-RPC envelope (unwrapped tolerantly) and both
- * numeric and string slot shapes. Returns null when the sidecar
- * gave us nothing usable — callers render "Quiet"/offline.
+ * Real shape: { healthy, slots: { processed, confirmed, finalized },
+ * absoluteSlot, blockHeight, ... } — no top-level `slot` key.
+ * Returns null when the sidecar gave us nothing usable — callers
+ * render "Quiet"/offline.
  */
 export function slotOf(raw: unknown): string | null {
   const data = unwrapMcp(raw);
@@ -14,9 +15,24 @@ export function slotOf(raw: unknown): string | null {
     return m ? m[0] : null;
   }
   if (!data || typeof data !== "object" || Array.isArray(data)) return null;
-  const slot = pickKey(data as Record<string, unknown>, ["slot"]);
-  if (typeof slot === "number" && Number.isFinite(slot))
-    return Math.floor(slot).toLocaleString("en-US");
-  if (typeof slot === "string" && slot.length < 24 && slot.length > 0) return slot;
+  const o = data as Record<string, unknown>;
+  const direct = pickKey(o, ["slot", "absoluteSlot", "absolute_slot", "blockHeight", "block_height"]);
+  const hit = fmtSlot(direct);
+  if (hit) return hit;
+  const nested = pickKey(o, ["slots"]);
+  if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+    const n = nested as Record<string, unknown>;
+    const inner = pickKey(n, ["confirmed", "processed", "finalized", "absoluteSlot"]);
+    const hitInner = fmtSlot(inner);
+    if (hitInner) return hitInner;
+  }
+  return null;
+}
+
+function fmtSlot(v: unknown): string | null {
+  if (typeof v === "number" && Number.isFinite(v)) {
+    return Math.floor(v).toLocaleString("en-US");
+  }
+  if (typeof v === "string" && /^\d[\d,]{4,23}$/.test(v)) return v;
   return null;
 }

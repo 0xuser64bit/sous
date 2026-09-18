@@ -23,7 +23,7 @@ export function PortfolioOverview() {
 
   const bal = useQuery({
     queryKey: ["balance", wallet],
-    queryFn: () => callMcp({ tool: "get_balance", wallet, args: {} }),
+    queryFn: () => callMcp({ tool: "get_balance", wallet, args: { wallet } }),
     enabled: Boolean(wallet),
     retry: 1,
   });

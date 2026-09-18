@@ -102,8 +102,10 @@ export async function signAndSubmitNeedsSignature(
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         signedTx: bytesToB64(serialized),
+        submit: payload.submit,
         blockhash: payload.blockhash,
         lastValidBlockHeight: payload.lastValidBlockHeight,
+        what: payload.what,
       }),
     });
   } catch {

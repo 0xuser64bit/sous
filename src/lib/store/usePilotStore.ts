@@ -26,9 +26,14 @@ export type QuoteData = {
   amount: number;
   from: string;
   to: string;
+  /** Resolved mints the sign-guard compares against (symbols lie, mints don't). */
+  expectFrom?: string;
+  expectTo?: string;
   /** Extra line on the ticket, e.g. limit price. */
   detailLabel?: string;
   detail?: string;
+  /** Losing venue quote, shown for honesty when both aggregators answer. */
+  altQuote?: string;
   /** Tool + args the ticket fires (used when no cached payload exists). */
   fireTool: McpTool;
   fireArgs: Record<string, unknown>;

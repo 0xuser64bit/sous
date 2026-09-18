@@ -48,7 +48,8 @@ See `docs/ARCHITECTURE.md`. TL;DR:
 
 - `src/lib/chain/` — RPC, program IDs, explorer links. Single source of truth.
 - `src/app/api/mcp` — proxy to `cookie-mcp` (external-signer). Browser sends `{tool, args}` + `x-cookie-wallet`. Gets data or `{status:'needs_signature', transactionBase64}` (envelope unwrapped client-side).
-- `src/app/api/tx/submit` — single on-chain write path. Relays signed bytes, confirms blockhash-aware, never retries expired quotes blindly.
+- `src/app/api/tx/submit` — single on-chain write path. Native `submit_signed_tx` first (sidecar knows the route submitter), direct-RPC fallback only when the sidecar is down, never retries expired quotes blindly.
+- `src/lib/mcp/` — validated proxy client (envelope unwrapped once, at the boundary), `tokens.ts` mint resolver (exact-match or refuse), `quotes.ts` dual-aggregator compare (cookiebox + cookiescan, survivor wins).
 - `src/lib/intent.ts` — local intent parser (swap/send/stake/limit/bridge/names/search). No network, no guessing with money.
 - `src/lib/tx/` — Nightly signing (transaction + message paths), typed `TxError` (rejected/expired/failed), shared limit-cancel flow.
 - `src/components/terminal/` — chat pass, paper `QuoteTicket` per money move, `TxPass` stepper (bounty-required feedback).

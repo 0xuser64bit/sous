@@ -61,7 +61,8 @@ export function StandingOrders() {
 
   const orders = useQuery({
     queryKey: ["limit_orders", wallet],
-    queryFn: () => callMcp({ tool: "get_limit_orders", wallet, args: {} }),
+    queryFn: () =>
+      callMcp({ tool: "get_limit_orders", wallet, args: { owner: wallet } }),
     enabled: Boolean(wallet),
     retry: 1,
     staleTime: 20_000,
@@ -121,7 +122,7 @@ export function StandingOrders() {
           <RowsError message={sidecarHint(orders.error.message)} onRetry={() => void orders.refetch()} />
         ) : !list.length ? (
           <p className="text-[12.5px]" style={{ color: "var(--text-tertiary)" }}>
-            No standing orders — “Limit buy 5 COOK → USDC at 0.5” writes one.
+            No standing orders — “Limit sell 5 bCOOK → COOK at 2.0” writes one.
           </p>
         ) : (
           <ul className="flex flex-col">

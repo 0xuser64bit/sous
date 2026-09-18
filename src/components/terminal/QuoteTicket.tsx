@@ -32,7 +32,7 @@ export function QuoteTicket({
   onFire: (msgId: string) => void;
   onDismiss: (msgId: string) => void;
 }) {
-  const { orderKind, amount, from, to, detailLabel, detail, outAmount, venue, impact, state, note } = quote;
+  const { orderKind, amount, from, to, detailLabel, detail, altQuote, outAmount, venue, impact, state, note } = quote;
   const dead = state === "fired" || state === "dismissed" || state === "failed";
 
   return (
@@ -64,6 +64,7 @@ export function QuoteTicket({
         <Line label="You receive" value={outAmount ?? "—"} strong />
         {detail && detailLabel && <Line label={detailLabel} value={detail} />}
         <Line label="Venue" value={venue ?? "best of Cookiebox · Candy Shop"} />
+        {altQuote && <Line label="Also quoted" value={altQuote} />}
         {impact && <Line label="Price impact" value={impact} />}
         <Line label="Est. fee" value="≈ 0.000005 COOK" />
       </dl>

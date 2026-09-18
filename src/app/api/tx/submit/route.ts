@@ -1,21 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { VersionedTransaction, Transaction } from "@solana/web3.js";
 import { getConnection } from "@/lib/chain/connection";
+import { unwrapMcp } from "@/lib/mcp/shapes";
+import { pickKey } from "@/lib/utils/format";
 
 /**
- * POST /api/tx/submit { signedTx, blockhash?, lastValidBlockHeight? }
+ * POST /api/tx/submit { signedTx, submit?, blockhash?, lastValidBlockHeight?, what? }
  *
- * Single on-chain write path. The browser signs with Nightly, the server
- * relays the signed bytes to Cookie Chain over the singleton connection
- * and confirms before responding.
+ * Single on-chain write path. The browser signs with Nightly; the server
+ * relays the signed bytes — first via the sidecar's native
+ * `submit_signed_tx` (it knows the per-route submit path: cookie-rpc,
+ * solana-rpc, candyshop), falling back to direct Cookie RPC only when
+ * the sidecar is unreachable.
  *
  * Safety rules:
  * - Never accept unsigned/unsigned-builder payloads — only fully-signed
- *   serialized transactions (base64, size-capped).
+ *   serialized transactions (base64, size-capped, structurally checked).
  * - Never retry blindly: an expired blockhash returns 409 + expired:true
  *   so the client re-quotes instead of resubmitting a dead transaction.
  * - An already-processed signature is returned as success (idempotent).
  */
+
+const MCP_URL = process.env.MCP_HTTP_URL ?? "http://127.0.0.1:8787/mcp";
+const MCP_SUBMIT_TIMEOUT_MS = 25_000;
 
 const MAX_TX_BYTES = 8192;
 const MIN_TX_BYTES = 64;
@@ -24,11 +31,120 @@ function fail(status: number, error: string, extra?: Record<string, unknown>) {
   return NextResponse.json({ error, ...extra }, { status });
 }
 
+function sigOf(payload: unknown): string | null {
+  if (typeof payload === "string" && payload.length >= 32) return payload;
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+  const v = pickKey(payload as Record<string, unknown>, [
+    "signature",
+    "txSignature",
+    "tx",
+    "txid",
+    "txHash",
+    "txhash",
+  ]);
+  return typeof v === "string" && v.length >= 32 ? v : null;
+}
+
+/** Native path: let cookie-mcp submit on the route it chose. Null = transport failure (try direct). */
+async function submitViaSidecar(args: {
+  signedTx: string;
+  submit?: unknown;
+  blockhash?: string;
+  lastValidBlockHeight?: number;
+  what?: string;
+}): Promise<{ signature: string } | { transportError: true } | { error: string; expired?: boolean }> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), MCP_SUBMIT_TIMEOUT_MS);
+  try {
+    const upstream = await fetch(MCP_URL, {
+      method: "POST",
+      signal: ctrl.signal,
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: `sous-submit-${Date.now().toString(36)}`,
+        method: "tools/call",
+        params: {
+          name: "submit_signed_tx",
+          arguments: {
+            signedTransactionBase64: args.signedTx,
+            ...(args.submit !== undefined ? { submit: args.submit } : {}),
+            ...(args.blockhash ? { blockhash: args.blockhash } : {}),
+            ...(typeof args.lastValidBlockHeight === "number"
+              ? { lastValidBlockHeight: args.lastValidBlockHeight }
+              : {}),
+            ...(args.what ? { what: args.what } : {}),
+          },
+        },
+      }),
+    });
+    const text = await upstream.text();
+    let json: unknown = null;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      return { error: "Sidecar returned non-JSON on submit." };
+    }
+    const payload = unwrapMcp(json);
+    const isErr =
+      (payload && typeof payload === "object" && (payload as Record<string, unknown>).isError === true) ||
+      (payload && typeof payload === "object" && "error" in (payload as Record<string, unknown>));
+    const sig = sigOf(payload);
+    if (sig) return { signature: sig };
+    if (isErr) {
+      const msg =
+        (payload as Record<string, unknown>).error instanceof Object
+          ? JSON.stringify((payload as Record<string, unknown>).error).slice(0, 300)
+          : String(
+              (payload as Record<string, unknown>).error ??
+                (payload as Record<string, unknown>).hint ??
+                text.slice(0, 300),
+            );
+      if (/already been processed|already processed|duplicate/i.test(msg)) {
+        return { error: "Transaction was already processed — check Cookiescan before re-firing." };
+      }
+      if (/blockhash not found|blockhash.*expired|expired/i.test(msg)) {
+        return { error: `Quote expired before submit (${msg}). Re-quote — do not resubmit.`, expired: true };
+      }
+      return { error: msg };
+    }
+    return { error: "Sidecar submit returned no signature." };
+  } catch {
+    return { transportError: true as const };
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+async function submitDirect(
+  bytes: Buffer,
+  blockhash?: string,
+  lastValidBlockHeight?: number,
+): Promise<string> {
+  const conn = getConnection();
+  const sig = await conn.sendRawTransaction(bytes, {
+    skipPreflight: false,
+    preflightCommitment: "confirmed",
+    maxRetries: 2,
+  });
+  if (blockhash && typeof lastValidBlockHeight === "number") {
+    await conn.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
+  } else {
+    await conn.confirmTransaction(sig, "confirmed");
+  }
+  return sig;
+}
+
 export async function POST(req: NextRequest) {
   let body: {
     signedTx?: unknown;
+    submit?: unknown;
     blockhash?: unknown;
     lastValidBlockHeight?: unknown;
+    what?: unknown;
   };
   try {
     body = await req.json();
@@ -43,8 +159,8 @@ export async function POST(req: NextRequest) {
     return fail(400, "signedTx is not valid base64");
   }
   if (
-    typeof body.blockhash === "string" &&
-    !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(body.blockhash)
+    body.blockhash !== undefined &&
+    (typeof body.blockhash !== "string" || !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(body.blockhash))
   ) {
     return fail(400, "blockhash is not valid base58");
   }
@@ -70,45 +186,46 @@ export async function POST(req: NextRequest) {
     return fail(400, "signedTx is not a valid serialized transaction");
   }
 
-  const conn = getConnection();
-  try {
-    const sig = await conn.sendRawTransaction(bytes, {
-      skipPreflight: false,
-      preflightCommitment: "confirmed",
-      maxRetries: 2,
-    });
+  const blockhash = typeof body.blockhash === "string" ? body.blockhash : undefined;
+  const lastValidBlockHeight =
+    typeof body.lastValidBlockHeight === "number" ? body.lastValidBlockHeight : undefined;
+  const what = typeof body.what === "string" ? body.what : undefined;
 
-    if (
-      typeof body.blockhash === "string" &&
-      typeof body.lastValidBlockHeight === "number"
-    ) {
-      await conn.confirmTransaction(
-        {
-          signature: sig,
-          blockhash: body.blockhash,
-          lastValidBlockHeight: body.lastValidBlockHeight,
-        },
-        "confirmed",
-      );
-    } else {
-      await conn.confirmTransaction(sig, "confirmed");
+  // 1) Native sidecar path (knows the per-route submitter).
+  try {
+    const via = await submitViaSidecar({
+      signedTx: body.signedTx,
+      submit: body.submit,
+      blockhash,
+      lastValidBlockHeight,
+      what,
+    });
+    if ("signature" in via) return NextResponse.json({ signature: via.signature });
+    if ("transportError" in via) {
+      // 2) Sidecar unreachable — direct RPC fallback (same safety checks).
+      try {
+        const sig = await submitDirect(bytes, blockhash, lastValidBlockHeight);
+        return NextResponse.json({ signature: sig, via: "cookie-rpc-direct" });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "submit failed";
+        if (/already been processed|already processed|duplicate/i.test(msg)) {
+          return NextResponse.json({
+            error: "Transaction was already processed — check Cookiescan for a matching transfer before re-firing.",
+            duplicate: true as const,
+          });
+        }
+        if (/blockhash not found|blockhash.*expired|expired/i.test(msg)) {
+          return fail(502, `Quote expired before submit (${msg}). Re-quote — do not resubmit.`, {
+            expired: true as const,
+          });
+        }
+        return fail(502, msg);
+      }
     }
-    return NextResponse.json({ signature: sig });
+    // Sidecar refused at the application level — do NOT fall back blindly.
+    if (via.expired) return fail(502, via.error, { expired: true as const });
+    return fail(502, via.error);
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "submit failed";
-    if (/already been processed|already processed|duplicate/i.test(msg)) {
-      // Idempotent: the tx landed; re-derive is impossible without the
-      // bytes, so surface a clear retry-with-signature hint instead.
-      return NextResponse.json({
-        error: "Transaction was already processed — check Cookiescan for a matching transfer before re-firing.",
-        duplicate: true as const,
-      });
-    }
-    if (/blockhash not found|blockhash.*expired|expired/i.test(msg)) {
-      return fail(502, `Quote expired before submit (${msg}). Re-quote — do not resubmit.`, {
-        expired: true as const,
-      });
-    }
-    return fail(502, msg);
+    return fail(502, e instanceof Error ? e.message : "submit failed");
   }
 }

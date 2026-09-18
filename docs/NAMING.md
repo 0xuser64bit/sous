@@ -9,5 +9,5 @@
 - Loader lines: Preheating oven… / Tasting the sauce… / Plating…
 - Package: `sous`
 
-TODO before submission: check `sous.cook` availability via `resolve_domain` +
-X handle + domain, then lock it in.
+TODO before submission: `sous.cook` is UNREGISTERED (verified live 2026-09-19:
+tier "long", 1500 COOK). Register it + lock X handle + domain, then tick this off.

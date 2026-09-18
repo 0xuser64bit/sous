@@ -6,15 +6,14 @@
 - [x] Verify: `pnpm typecheck && pnpm lint && pnpm test && pnpm build` + `pnpm dev` + connect Nightly on localhost
 
 ## 01 Harden signing path ✅
-- [x] Server `POST /api/tx/submit` relay (signed bytes via singleton connection, blockhash-aware confirm, 409+expired — never retry blindly)
+- [x] Server `POST /api/tx/submit` relay (native `submit_signed_tx` first — sidecar knows the per-route submitter; direct RPC fallback only when sidecar is down; 409+expired — never retry blindly)
 - [x] Nightly signTransaction + signMessage both paths, typed TxError (rejected/expired/failed), toasts per phase
 - [x] Browser-safe base64 codecs (no Node Buffer in client), MCP proxy validates wallet/body/args and honors upstream errors
 
 ## 02 Real agent loop (core winner) ✅
 - [x] Intent parser (tiny, local): swap / transfer / stake / unstake / limit / orders / cancel / bridge / resolve / search (+ 23 unit tests)
-- [x] Always: quote/read first -> paper ticket -> `trade|transfer|stake|place_limit_order|bridge` -> needs_signature -> Nightly sign -> confirm -> Cookiescan link
-- [x] Decoded summary guard per kind (incl. limit price, bridge amount+token) before sign; refuse on mismatch
-- [ ] Multi-aggregator compare side-by-side (venue line shown; true A/B compare needs Cookiebox+Candy Shop quote shapes from sidecar)
+- [x] Always: resolve mints via search_tokens -> quote BOTH aggregators (cookiebox + cookiescan, survivor wins) -> paper ticket with venue + also-quoted line -> `trade` with winning aggregator -> needs_signature -> Nightly sign -> confirm -> Cookiescan link
+- [x] Decoded summary guard per kind (mint-aware: symbols lie, mints don't; incl. limit price, bridge amount+token) before sign; refuse on mismatch
 
 ## 03 DCA / limit-stop bot ✅ (partial — keeper fills are sidecar-side)
 - [x] UI: place_limit_order (limit + price), list via get_limit_orders, cancel via shared cancelLimitOrder helper (chat + pantry agree)

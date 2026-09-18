@@ -32,9 +32,14 @@ export type NeedsSignature = {
   transactionBase64?: string;
   /** UTF-8 message to sign when kind === "message". */
   message?: string;
+  /** Route hint for submit_signed_tx ({ via: cookie-rpc | solana-rpc | candyshop }). */
   submit?: unknown;
   blockhash?: string;
   lastValidBlockHeight?: number;
+  /** Names the action for submit_signed_tx. */
+  what?: string;
+  /** Intermediate-step hint: call the original tool again afterwards. */
+  step?: string;
   summary?: Record<string, unknown>;
   next?: string;
 };

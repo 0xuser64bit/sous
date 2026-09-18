@@ -67,6 +67,15 @@ describe("parseIntent", () => {
       from: "COOK",
       to: "USDC",
       price: 0.5,
+      orderKind: "limit",
+    });
+    expect(parseIntent("stop sell 5 bCOOK -> COOK at 1.1")).toMatchObject({
+      kind: "limit",
+      orderKind: "stop",
+    });
+    expect(parseIntent("stop 5 bCOOK -> COOK at 1.1")).toMatchObject({
+      kind: "limit",
+      orderKind: "stop",
     });
     expect(parseIntent("show my open orders").kind).toBe("orders");
     expect(parseIntent("cancel order abc123")).toEqual({

@@ -1,7 +1,7 @@
-# Architecture — Sous v0
+# Architecture — Sous v1
 
 ## Goal
-Prove Cookie Chain's edge: sub-second finality + ~0.000005 COOK fees + $0.05 deploys
+Prove Cookie Chain's edge: sub-second finality + ~0.000005 COOK fees
 make AI-driven micro-trading usable. Every money action is a real on-chain tx
 signed by the user's Nightly wallet.
 
@@ -12,19 +12,32 @@ signed by the user's Nightly wallet.
   connect Nightly (wallet-adapter, NightlyWalletAdapter first)
   display address (shortAddr + copy + disconnect)
        |
-  chat input -> POST /api/mcp {tool, args} + x-cookie-wallet
+  chat input -> parseIntent (local, no network) -> ticket
        |
-[Next API: /api/mcp] -> cookie-mcp (COOKIE_SIGNER=external, --http 8787)
-  tools: chain_health, search_tokens, get_quote, get_balance, get_pools,
-         stake_info, trade, transfer, stake/unstake, place_limit_order,
-         bridge, resolve_domain ...
+  POST /api/mcp {tool, args} + x-cookie-wallet   (reads + unsigned builders)
+       |
+  cookie-mcp (COOKIE_SIGNER=external, --http 8787)
+  tools: chain_health, search_tokens, get_token_info, get_quote,
+         get_balance, get_pools, stake_info, trade, transfer,
+         stake/unstake, place_limit_order, get_limit_orders,
+         cancel_limit_order, bridge, bridge_status, resolve_domain
        |
   returns data OR {status:'needs_signature', transactionBase64, blockhash, ...}
+  (client unwraps the JSON-RPC envelope in callMcp, then checks status)
        |
-[Browser] Nightly signTransaction -> sendRawTransaction(rpc.cookiescan.io)
-  -> confirm -> TxStatusCard (idle/quoting/awaiting_signature/sending/
+  guardSummary(intent vs summary) — refuse on mismatch
+       |
+  Nightly signTransaction -> POST /api/tx/submit {signedTx, blockhash?, lvbh?}
+  -> singleton Connection: sendRawTransaction + blockhash-aware confirm
+  -> TxPass stepper (idle/quoting/awaiting_signature/sending/
      confirming/confirmed/failed) + Cookiescan link + sonner toast
 ```
+
+Money moves (swap, transfer, stake, unstake, limit, bridge) ALWAYS go
+through a paper QuoteTicket (orderKind + fireTool + fireArgs) and fire
+only from the ticket. Rejected signatures return the ticket to
+`proposed`; expired blockhashes 409 with `expired:true` and are never
+resubmitted — the user re-fires for a fresh quote.
 
 ## Key invariants
 1. Never `new Connection` outside `lib/chain/connection.ts`.
@@ -32,14 +45,16 @@ signed by the user's Nightly wallet.
 3. Never put private keys in web env. MCP runs keyless (external-signer).
 4. All chain constants in `lib/chain/config.ts` (RPC, programs, mints).
 5. All explorer links via `lib/chain/explorer.ts`.
+6. All chain writes go through `/api/tx/submit` (never blind retries).
+7. Never sign when the sidecar summary contradicts the ticket.
 
 ## Data sources
-- Reads: cookie-mcp tools + `https://api.cookiescan.io` (DAS) for charts/history (TASK 04).
-- Swaps: Cookiebox agg `https://agg.cookiebox.app` + Candy Shop, compared side-by-side.
-- Solana side: Jupiter + Hyperlane bridge status (view only).
+- Reads: cookie-mcp tools (above) + live slot poll for the throughput sparkline.
+- Swaps: Cookiebox agg `https://agg.cookiebox.app` + Candy Shop venue line (full A/B compare pending sidecar quote shapes).
+- Solana side: bridge quote ticket + status tooling (status board pending).
+- DAS `https://api.cookiescan.io` base in config; token-history charts pending.
 
-## Next steps (see TASKS.md)
-- 02: real planner loop (intent -> get_quote both aggs -> trade -> submit_signed_tx server path)
-- 03: limit/stop DCA bot UI
-- 04: DAS charts (recharts) + activity feed + PnL
-- 05: bridge + .cook + launchpad tabs
+## Test strategy
+`pnpm test` (vitest, no DOM needed): intent parser, MCP shape helpers,
+slot unwrap, tx base64 codecs, cancel flow with mocked fetch.
+Sidecar/wallet flows are verified manually (see README demo + BOUNTY script).

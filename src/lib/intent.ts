@@ -37,6 +37,8 @@ export type LimitIntent = {
   to: string;
   /** Target price quoted in `to` per `from` (e.g. 0.5 USDC per COOK). */
   price: number;
+  /** take-profit vs stop-loss (stop-market). */
+  orderKind: "limit" | "stop";
 };
 
 export type Intent =
@@ -189,6 +191,7 @@ export function parseIntent(input: string): Intent {
         from: normToken(limit[4]),
         to: normToken(limit[5]),
         price,
+        orderKind: (limit[1] ?? "").toLowerCase() === "stop" ? "stop" : "limit",
       };
     }
   }
@@ -247,10 +250,10 @@ export function parseIntent(input: string): Intent {
   return { kind: "unknown", raw: text };
 }
 
-/** Example orders shown on the empty pass. */
+/** Example orders shown on the empty pass (all verified against live pairs). */
 export const EXAMPLE_ORDERS = [
   "Quote 10 COOK → bCOOK",
-  "Swap 5 COOK → USDC",
   "Send 2 COOK to alice.cook",
+  "Limit sell 5 bCOOK → COOK at 2.0",
   "What is my balance?",
 ] as const;

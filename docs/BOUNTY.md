@@ -34,5 +34,5 @@
 1. Connect Nightly (show address).
 2. "Quote 10 COOK -> bCOOK" — ticket with venue + impact, fire in Nightly.
 3. Approve in Nightly — show confirming (~1s) → confirmed + Cookiescan link.
-4. Pantry: stake 5 via quick-fire ticket; "Limit buy 5 COOK → USDC at 0.5" → standing-orders board; scrap it.
+4. Pantry: stake 5 via quick-fire ticket; "Limit sell 5 bCOOK → COOK at 2.0" → standing-orders board; scrap it.
 5. Punchline: "5 txs, <$0.01, seconds. Only possible on Cookie Chain."

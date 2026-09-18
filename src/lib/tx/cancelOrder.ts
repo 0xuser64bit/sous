@@ -19,7 +19,7 @@ export async function cancelLimitOrder(opts: {
   const res = await callMcp({
     tool: "cancel_limit_order",
     wallet: opts.wallet,
-    args: { orderId: opts.orderId },
+    args: { order: opts.orderId },
   });
   if (!isNeedsSignature(res)) return { note: "cancelled" };
   if (res.kind !== "transaction" || !res.transactionBase64) {

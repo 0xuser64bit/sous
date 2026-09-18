@@ -6,9 +6,9 @@ import { toast } from "sonner";
 import {
   callMcp,
   isNeedsSignature,
-  type McpTool,
-  type NeedsSignature,
 } from "@/lib/mcp/client";
+import { resolveMint } from "@/lib/mcp/tokens";
+import { quoteBoth } from "@/lib/mcp/quotes";
 import {
   usePilotStore,
   type ChatMsg,
@@ -31,14 +31,18 @@ import {
   pickKey,
   isAddressLike,
 } from "@/lib/utils/format";
-import { unwrapMcp, str, toRows } from "@/lib/mcp/shapes";
+import { unwrapMcp, toRows } from "@/lib/mcp/shapes";
 import { txUrl, addressUrl } from "@/lib/chain/explorer";
-import { CHAIN_META } from "@/lib/chain/config";
+import { CHAIN_META, NATIVE_COOK_MINT } from "@/lib/chain/config";
 
-/* ─── Tool args — one place to align with the cookie-mcp schema ─── */
+/* ─── Sign-guard comparisons: exact for mints, lenient for symbols ─── */
 
-function orderArgs(intent: { amount: number; from: string; to: string }) {
-  return { from: intent.from, to: intent.to, amount: intent.amount };
+function sameRef(a: string, b: string): boolean {
+  if (a === b) return true;
+  if (!isAddressLike(a) && !isAddressLike(b)) {
+    return a.toLowerCase() === b.toLowerCase();
+  }
+  return false;
 }
 
 /** The ticket number of the most recent user order. */
@@ -50,12 +54,6 @@ function lastTicketNo(): number | undefined {
     }
   }
   return undefined;
-}
-
-/** pickKey rendered, or undefined when absent (so fallbacks trigger). */
-function pickStr(o: Record<string, unknown>, names: string[]): string | undefined {
-  const v = pickKey(o, names);
-  return v === undefined || v === null ? undefined : str(v);
 }
 
 function numOf(v: unknown): number | null {
@@ -76,13 +74,13 @@ function summaryMatches(
 ): { ok: boolean; detail?: string } {
   if (!summary || typeof summary !== "object") return { ok: true };
   const s = summary as Record<string, unknown>;
-  const sFrom = pickKey(s, ["from", "input", "inMint", "src", "source", "sell"]);
-  const sTo = pickKey(s, ["to", "output", "outMint", "dst", "dest", "buy"]);
+  const sFrom = pickKey(s, ["from", "input", "inputMint", "inMint", "src", "source", "sell"]);
+  const sTo = pickKey(s, ["to", "output", "outputMint", "outMint", "dst", "dest", "buy"]);
   const sAmt = pickKey(s, ["amount", "inAmount", "quantity", "value"]);
-  if (typeof sFrom === "string" && sFrom.toLowerCase() !== intent.from.toLowerCase()) {
+  if (typeof sFrom === "string" && !sameRef(sFrom, intent.from)) {
     return { ok: false, detail: `summary says ${sFrom}, order says ${intent.from}` };
   }
-  if (typeof sTo === "string" && sTo.toLowerCase() !== intent.to.toLowerCase()) {
+  if (typeof sTo === "string" && !sameRef(sTo, intent.to)) {
     return { ok: false, detail: `summary says ${sTo}, order says ${intent.to}` };
   }
   if (sAmt !== undefined && !amountsMatch(sAmt, intent.amount)) {
@@ -98,18 +96,18 @@ function transferMatches(
   if (!summary || typeof summary !== "object") return { ok: true };
   const s = summary as Record<string, unknown>;
   const sAmt = pickKey(s, ["amount", "inAmount", "quantity", "value"]);
-  const sTok = pickKey(s, ["token", "mint", "symbol", "currency"]);
+  const sTok = pickKey(s, ["mint", "token", "symbol", "currency", "inputMint"]);
   const sTo = pickKey(s, ["to", "dest", "destination", "recipient", "address", "owner"]);
   if (sAmt !== undefined && !amountsMatch(sAmt, intent.amount)) {
     return { ok: false, detail: `summary says ${sAmt}, order says ${intent.amount}` };
   }
-  if (typeof sTok === "string" && sTok.toLowerCase() !== intent.token.toLowerCase()) {
+  if (typeof sTok === "string" && !sameRef(sTok, intent.token)) {
     return { ok: false, detail: `summary says ${sTok}, order says ${intent.token}` };
   }
   if (typeof sTo === "string") {
     const a = sTo.trim().replace(/[.,;!?)]+$/, "");
     const b = intent.to.trim();
-    if (a !== b && a.toLowerCase() !== b.toLowerCase()) {
+    if (!sameRef(a, b)) {
       return { ok: false, detail: `summary pays ${a}, order pays ${b}` };
     }
   }
@@ -121,9 +119,14 @@ function guardSummary(
   summary: unknown,
   q: QuoteData,
 ): { ok: boolean; detail?: string } {
+  const pair = {
+    amount: q.amount,
+    from: q.expectFrom ?? q.from,
+    to: q.expectTo ?? q.to,
+  };
   switch (q.orderKind) {
     case "transfer":
-      return transferMatches(summary, { amount: q.amount, token: q.from, to: q.to });
+      return transferMatches(summary, { amount: q.amount, token: pair.from, to: q.to });
     case "bridge": {
       // Destinations are chain-side addresses — only amount + token are stable.
       if (!summary || typeof summary !== "object") return { ok: true };
@@ -133,13 +136,13 @@ function guardSummary(
       if (sAmt !== undefined && !amountsMatch(sAmt, q.amount)) {
         return { ok: false, detail: `summary says ${sAmt}, order says ${q.amount}` };
       }
-      if (typeof sTok === "string" && sTok.toLowerCase() !== q.from.toLowerCase()) {
-        return { ok: false, detail: `summary says ${sTok}, order says ${q.from}` };
+      if (typeof sTok === "string" && !sameRef(sTok, pair.from)) {
+        return { ok: false, detail: `summary says ${sTok}, order says ${pair.from}` };
       }
       return { ok: true };
     }
     case "limit": {
-      const base = summaryMatches(summary, q);
+      const base = summaryMatches(summary, pair);
       if (!base.ok) return base;
       if (summary && typeof summary === "object") {
         const p = pickKey(summary as Record<string, unknown>, [
@@ -156,7 +159,7 @@ function guardSummary(
       return { ok: true };
     }
     default:
-      return summaryMatches(summary, q);
+      return summaryMatches(summary, pair);
   }
 }
 
@@ -213,7 +216,7 @@ function servedText(q: QuoteData): string {
     case "unstake":
       return `Served — unstaked ${q.amount} bCOOK.`;
     case "bridge":
-      return `Bridging — ${q.amount} ${q.from} → ${q.to}. Track it with “bridge status”.`;
+      return `Bridging — ${q.amount} ${q.from} → ${q.to}. Warp delivery takes minutes; the signature link lands here when it confirms.`;
     default:
       return `Served — ${q.amount} ${q.from} → ${q.to}.`;
   }
@@ -235,7 +238,7 @@ function findAddress(v: unknown): string | null {
 }
 
 const HELP_TEXT =
-  "I fire swaps, sends, stakes, limit orders, and bridge quotes — and I read your ledger, tokens, and .cook names. Try “Quote 10 COOK → bCOOK”, “Send 2 COOK to alice.cook”, or “Limit buy 5 COOK → USDC at 0.5”. I quote first — nothing is signed until you fire the ticket in Nightly.";
+  "I fire swaps, sends, stakes, limit/stop orders, and bridge quotes — and I read your ledger, tokens, and .cook names. Try “Quote 10 COOK → bCOOK”, “Send 2 COOK to alice.cook”, or “Limit sell 5 bCOOK → COOK at 2.0”. I quote first — nothing is signed until you fire the ticket in Nightly.";
 
 /**
  * The pass. Orders go up as numbered tickets; quotes come back as paper;
@@ -255,7 +258,6 @@ export function ChatPanel() {
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const areaRef = useRef<HTMLTextAreaElement>(null);
-  const pendingTx = useRef(new Map<string, NeedsSignature>());
 
   const wallet = publicKey?.toBase58();
 
@@ -287,17 +289,23 @@ export function ChatPanel() {
         case "swap":
           await runSwap(intent);
           break;
-        case "transfer":
+        case "transfer": {
+          const meta = await resolveMint(intent.token, wallet);
           await proposeTicket({
             orderKind: "transfer",
             amount: intent.amount,
-            from: intent.token,
+            from: meta.symbol,
             to: intent.to,
+            expectFrom: meta.mint,
             fireTool: "transfer",
-            fireArgs: { amount: intent.amount, token: intent.token, to: intent.to },
+            // Native COOK travels without `mint`; SPL needs it.
+            fireArgs: meta.native
+              ? { to: intent.to, amount: intent.amount }
+              : { to: intent.to, amount: intent.amount, mint: meta.mint },
             note: "Review the destination — sends cannot be undone.",
           });
           break;
+        }
         case "stake":
           if (intent.amount === null) await runStakeInfo();
           else
@@ -324,43 +332,82 @@ export function ChatPanel() {
               fireArgs: { amount: intent.amount },
             });
           break;
-        case "limit":
+        case "limit": {
+          const [inMeta, outMeta] = await Promise.all([
+            resolveMint(intent.from, wallet),
+            resolveMint(intent.to, wallet),
+          ]);
           await proposeTicket({
             orderKind: "limit",
             amount: intent.amount,
-            from: intent.from,
-            to: intent.to,
-            detailLabel: "Limit price",
-            detail: `@ ${intent.price} ${intent.to} per ${intent.from}`,
+            from: inMeta.symbol,
+            to: outMeta.symbol,
+            expectFrom: inMeta.mint,
+            expectTo: outMeta.mint,
+            detailLabel: intent.orderKind === "stop" ? "Stop trigger" : "Limit price",
+            detail: `@ ${intent.price} ${outMeta.symbol} per ${inMeta.symbol}`,
             fireTool: "place_limit_order",
             fireArgs: {
-              from: intent.from,
-              to: intent.to,
+              inputMint: inMeta.mint,
+              outputMint: outMeta.mint,
               amount: intent.amount,
               price: intent.price,
+              kind: intent.orderKind,
             },
-            note: "Rests as a standing order until filled, cancelled, or expired.",
+            note:
+              intent.orderKind === "stop"
+                ? "Stop-market: the keeper sells at market once the rate falls here."
+                : "Rests as a standing order until filled, cancelled, or expired.",
           });
           break;
+        }
         case "orders":
           await runOrders();
           break;
         case "cancel":
           await runCancel(intent.orderId);
           break;
-        case "bridge":
+        case "bridge": {
+          // The warp route only speaks COOK, 1:1.
+          const meta = await resolveMint(intent.token, wallet);
+          if (!meta.native) {
+            push({
+              role: "assistant",
+              text: `The bridge only carries native COOK, Chef — ${meta.symbol} can't ride it. Swap to COOK first, then bridge.`,
+            });
+            break;
+          }
+          const direction = intent.toChain.startsWith("sol")
+            ? "cookie-to-solana"
+            : intent.toChain.startsWith("cook")
+              ? "solana-to-cookie"
+              : null;
+          if (!direction) {
+            push({
+              role: "assistant",
+              text: `I only see two ends of that bridge, Chef — “solana” or “cookie”. Where should the COOK land?`,
+            });
+            break;
+          }
+          const dest = findAddress(text);
           await proposeTicket({
             orderKind: "bridge",
             amount: intent.amount,
-            from: intent.token,
+            from: "COOK",
             to: intent.toChain,
+            expectFrom: NATIVE_COOK_MINT,
             detailLabel: "Route",
-            detail: `Cookie Chain → ${intent.toChain}`,
+            detail: `Cookie Chain → ${intent.toChain}${dest ? ` · ${shortAddr(dest, 6)}` : ""}`,
             fireTool: "bridge",
-            fireArgs: { amount: intent.amount, token: intent.token, toChain: intent.toChain },
-            note: "Bridges settle on the far chain — slower than a swap. Track with “bridge status”.",
+            fireArgs: {
+              direction,
+              amount: intent.amount,
+              ...(dest ? { to: dest } : {}),
+            },
+            note: "Bridges settle on the far chain in minutes — slower than a swap.",
           });
           break;
+        }
         case "resolve":
           await runResolve(intent.name);
           break;
@@ -414,44 +461,37 @@ export function ChatPanel() {
   async function runSwap(intent: { amount: number; from: string; to: string }) {
     if (!needWallet()) return;
     setPhase("quoting");
-    const fireTool: McpTool = "trade";
-    const fireArgs = orderArgs(intent);
-    const res = await callMcp({ tool: "get_quote", wallet, args: fireArgs });
-
-    if (isNeedsSignature(res)) {
-      // Executable quote — stash the payload, let the ticket fire it.
-      const summary =
-        typeof res.summary === "object" && res.summary !== null
-          ? (res.summary as Record<string, unknown>)
-          : null;
-      const id = proposeTicket({
-        orderKind: "swap",
-        ...intent,
-        outAmount: summary
-          ? pickStr(summary, ["outAmount", "outputAmount", "amountOut", "toAmount"])
-          : undefined,
-        fireTool,
-        fireArgs,
-        note: "Executable quote — review the amounts, then fire.",
-      });
-      pendingTx.current.set(id, res);
-      setPhase("idle");
-      return;
-    }
-
-    const q = unwrapMcp(res);
-    const obj = q && typeof q === "object" ? (q as Record<string, unknown>) : null;
+    const [inMeta, outMeta] = await Promise.all([
+      resolveMint(intent.from, wallet),
+      resolveMint(intent.to, wallet),
+    ]);
+    const { best, alt } = await quoteBoth({
+      inputMint: inMeta.mint,
+      outputMint: outMeta.mint,
+      amount: intent.amount,
+      wallet,
+    });
     proposeTicket({
       orderKind: "swap",
-      ...intent,
-      outAmount: obj
-        ? pickStr(obj, ["outAmount", "outputAmount", "amountOut", "out", "receivedAmount", "toAmount"])
-        : undefined,
-      venue: obj ? pickStr(obj, ["venue", "aggregator", "dex", "source", "router"]) : undefined,
-      impact: obj ? pickStr(obj, ["priceImpact", "impact", "slippage"]) : undefined,
-      fireTool,
-      fireArgs,
-      note: obj ? undefined : typeof q === "string" ? q.slice(0, 160) : "Quoted — amounts verified again at signing.",
+      amount: intent.amount,
+      from: inMeta.symbol,
+      to: outMeta.symbol,
+      expectFrom: inMeta.mint,
+      expectTo: outMeta.mint,
+      outAmount: best.out,
+      venue: best.venue ? `${best.aggregator} · ${best.venue}` : best.aggregator,
+      altQuote: alt ? `${alt.aggregator} ${alt.out}` : undefined,
+      impact: best.impact,
+      fireTool: "trade",
+      fireArgs: {
+        inputMint: inMeta.mint,
+        outputMint: outMeta.mint,
+        amount: intent.amount,
+        aggregator: best.aggregator,
+      },
+      note: alt
+        ? `Best of two venues — the other quoted ${alt.out}.`
+        : "Single venue answered — quoted alone.",
     });
     setPhase("idle");
   }
@@ -466,19 +506,15 @@ export function ChatPanel() {
     setError(null);
     updateQuote(msgId, { state: "firing" });
     try {
-      let payload = pendingTx.current.get(msgId);
-      if (!payload) {
-        setPhase("quoting");
-        const res = await callMcp({ tool: q.fireTool, wallet, args: q.fireArgs });
-        if (!isNeedsSignature(res)) {
-          updateQuote(msgId, { state: "fired", note: "Filled directly by the sidecar." });
-          push({ role: "assistant", text: servedText(q) });
-          setPhase("idle");
-          return;
-        }
-        payload = res;
+      setPhase("quoting");
+      const res = await callMcp({ tool: q.fireTool, wallet, args: q.fireArgs });
+      if (!isNeedsSignature(res)) {
+        updateQuote(msgId, { state: "fired", note: "Filled directly by the sidecar." });
+        push({ role: "assistant", text: servedText(q) });
+        setPhase("idle");
+        return;
       }
-      pendingTx.current.delete(msgId);
+      const payload = res;
 
       if (payload.kind === "message") {
         if (!signMessage) throw new TxError("failed", "This wallet cannot sign messages.");
@@ -533,7 +569,6 @@ export function ChatPanel() {
   }
 
   function onDismiss(msgId: string) {
-    pendingTx.current.delete(msgId);
     updateQuote(msgId, { state: "dismissed" });
   }
 
@@ -544,7 +579,7 @@ export function ChatPanel() {
     }
     setPhase("quoting");
     try {
-      const res = await callMcp({ tool: "get_balance", wallet, args: {} });
+      const res = await callMcp({ tool: "get_balance", wallet, args: { wallet } });
       const { rows, more } = toRows(unwrapMcp(res));
       push({
         role: "assistant",
@@ -584,7 +619,11 @@ export function ChatPanel() {
   async function runOrders() {
     setPhase("quoting");
     try {
-      const res = await callMcp({ tool: "get_limit_orders", wallet, args: {} });
+      const res = await callMcp({
+        tool: "get_limit_orders",
+        wallet,
+        args: wallet ? { owner: wallet } : {},
+      });
       if (isNeedsSignature(res)) throw new TxError("failed", "Order book needs no signature — unexpected sidecar reply.");
       const { rows, more } = toRows(unwrapMcp(res), 8);
       if (!rows.length) {
@@ -640,7 +679,7 @@ export function ChatPanel() {
   async function runResolve(name: string) {
     setPhase("quoting");
     try {
-      const res = await callMcp({ tool: "resolve_domain", wallet, args: { domain: name } });
+      const res = await callMcp({ tool: "resolve_domain", wallet, args: { name } });
       if (isNeedsSignature(res)) throw new TxError("failed", "Name lookup needs no signature — unexpected sidecar reply.");
       const payload = unwrapMcp(res);
       const addr = findAddress(payload);
