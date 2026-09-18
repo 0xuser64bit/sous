@@ -12,6 +12,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 const MCP_URL = process.env.MCP_HTTP_URL ?? "http://127.0.0.1:8787/mcp";
 const TIMEOUT_MS = Number(process.env.MCP_TIMEOUT_MS ?? 45000);
+/** Largest proxied body (tool args are small JSON; this blocks junk). */
+const MAX_BODY_BYTES = 32 * 1024;
 
 const ALLOW = new Set([
   "chain_health",
@@ -27,24 +29,41 @@ const ALLOW = new Set([
   "unstake",
   "place_limit_order",
   "get_limit_orders",
+  "cancel_limit_order",
   "bridge",
   "bridge_status",
   "resolve_domain",
 ]);
 
+const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+
 export async function POST(req: NextRequest) {
   const wallet = req.headers.get("x-cookie-wallet") ?? "";
-  let body: { tool?: string; args?: Record<string, unknown> };
+  if (wallet && !BASE58.test(wallet)) {
+    return NextResponse.json(
+      { error: "Invalid wallet address in x-cookie-wallet" },
+      { status: 400 },
+    );
+  }
+
+  const raw = await req.text().catch(() => "");
+  if (raw.length > MAX_BODY_BYTES) {
+    return NextResponse.json({ error: "Request too large" }, { status: 413 });
+  }
+  let body: { tool?: unknown; args?: unknown };
   try {
-    body = await req.json();
+    body = JSON.parse(raw || "{}");
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  if (!body.tool || !ALLOW.has(body.tool)) {
+  if (typeof body.tool !== "string" || !ALLOW.has(body.tool)) {
     return NextResponse.json(
-      { error: `Tool not allowed: ${body.tool}` },
+      { error: `Tool not allowed: ${String(body.tool).slice(0, 64)}` },
       { status: 400 },
     );
+  }
+  if (body.args !== undefined && (typeof body.args !== "object" || body.args === null)) {
+    return NextResponse.json({ error: "args must be a JSON object" }, { status: 400 });
   }
 
   const ctrl = new AbortController();
@@ -60,12 +79,18 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         jsonrpc: "2.0",
-        id: Date.now(),
+        id: `sous-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
         method: "tools/call",
         params: { name: body.tool, arguments: body.args ?? {} },
       }),
     });
     const text = await upstream.text();
+    if (!upstream.ok) {
+      return NextResponse.json(
+        { error: `MCP ${body.tool} failed (upstream ${upstream.status}): ${text.slice(0, 300)}` },
+        { status: 502 },
+      );
+    }
     // Streamable HTTP may return SSE; pass through as JSON if possible.
     try {
       return NextResponse.json(JSON.parse(text));

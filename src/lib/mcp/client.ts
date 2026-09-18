@@ -19,6 +19,7 @@ export type McpTool =
   | "unstake"
   | "place_limit_order"
   | "get_limit_orders"
+  | "cancel_limit_order"
   | "bridge"
   | "bridge_status"
   | "resolve_domain";
