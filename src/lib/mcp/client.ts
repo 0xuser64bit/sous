@@ -28,6 +28,8 @@ export type NeedsSignature = {
   tool: string;
   kind: "transaction" | "message";
   transactionBase64?: string;
+  /** UTF-8 message to sign when kind === "message". */
+  message?: string;
   submit?: unknown;
   blockhash?: string;
   lastValidBlockHeight?: number;
