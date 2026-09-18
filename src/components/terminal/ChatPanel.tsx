@@ -506,50 +506,18 @@ export function ChatPanel() {
     setError(null);
     updateQuote(msgId, { state: "firing" });
     try {
-      setPhase("quoting");
-      const res = await callMcp({ tool: q.fireTool, wallet, args: q.fireArgs });
-      if (!isNeedsSignature(res)) {
-        updateQuote(msgId, { state: "fired", note: "Filled directly by the sidecar." });
-        push({ role: "assistant", text: servedText(q) });
-        setPhase("idle");
-        return;
-      }
-      const payload = res;
-
-      if (payload.kind === "message") {
-        if (!signMessage) throw new TxError("failed", "This wallet cannot sign messages.");
-        setPhase("awaiting_signature");
-        const text = payload.message ?? payload.next ?? q.fireTool;
-        const sig = await signMessageNeedsSignature(text, (bytes) => signMessage(bytes));
-        setPhase("idle");
-        updateQuote(msgId, { state: "fired", note: "Message proof signed." });
-        push({
-          role: "assistant",
-          text: `Signed proof · ${shortAddr(sig, 6)} — hand it to whatever asked for it.`,
+      // Some actions run in steps (e.g. bridge preflights): when the
+      // sidecar answers step:'intermediate', we call the original tool
+      // again to continue. Bounded so we never sign-loop.
+      for (let step = 0; step < 3; step++) {
+        const done = await fireOnce(msgId, q);
+        if (done) return;
+        updateQuote(msgId, {
+          state: "firing",
+          note: "First leg confirmed — firing the follow-up.",
         });
-        toast.success("Proof signed");
-        return;
       }
-
-      const check = guardSummary(payload.summary, q);
-      if (!check.ok) {
-        throw new TxError("failed", `Refused to sign — ${check.detail ?? "summary mismatch"}.`);
-      }
-
-      setPhase("awaiting_signature");
-      toast("Approve in Nightly", {
-        description: `${q.amount} ${q.from} → ${q.to} — check the amounts match.`,
-      });
-      const sig = await signAndSubmitNeedsSignature(payload, signTransaction!);
-      setSignature(sig);
-      setPhase("confirmed");
-      updateQuote(msgId, { state: "fired" });
-      push({
-        role: "assistant",
-        text: servedText(q),
-        signature: sig,
-      });
-      toast.success(`Served · ${shortAddr(sig, 6)}`);
+      throw new TxError("failed", "Too many signing steps — stopped rather than loop.");
     } catch (e) {
       if (e instanceof TxError && e.code === "rejected") {
         setPhase("idle");
@@ -570,6 +538,59 @@ export function ChatPanel() {
 
   function onDismiss(msgId: string) {
     updateQuote(msgId, { state: "dismissed" });
+  }
+
+  /**
+   * One quote->guard->sign->submit round. Returns true when the ticket
+   * is done, false when the sidecar asked for an intermediate follow-up.
+   */
+  async function fireOnce(msgId: string, q: QuoteData): Promise<boolean> {
+    setPhase("quoting");
+    const res = await callMcp({ tool: q.fireTool, wallet, args: q.fireArgs });
+    if (!isNeedsSignature(res)) {
+      if (msgId) updateQuote(msgId, { state: "fired", note: "Filled directly by the sidecar." });
+      push({ role: "assistant", text: servedText(q) });
+      setPhase("idle");
+      return true;
+    }
+    const payload = res;
+
+    if (payload.kind === "message") {
+      if (!signMessage) throw new TxError("failed", "This wallet cannot sign messages.");
+      setPhase("awaiting_signature");
+      const text = payload.message ?? payload.next ?? q.fireTool;
+      const sig = await signMessageNeedsSignature(text, (bytes) => signMessage(bytes));
+      setPhase("idle");
+      if (msgId) updateQuote(msgId, { state: "fired", note: "Message proof signed." });
+      push({
+        role: "assistant",
+        text: `Signed proof · ${shortAddr(sig, 6)} — hand it to whatever asked for it.`,
+      });
+      toast.success("Proof signed");
+      return true;
+    }
+
+    const check = guardSummary(payload.summary, q);
+    if (!check.ok) {
+      throw new TxError("failed", `Refused to sign — ${check.detail ?? "summary mismatch"}.`);
+    }
+
+    setPhase("awaiting_signature");
+    toast("Approve in Nightly", {
+      description: `${q.amount} ${q.from} → ${q.to} — check the amounts match.`,
+    });
+    const sig = await signAndSubmitNeedsSignature(payload, signTransaction!);
+    setSignature(sig);
+    if (payload.step === "intermediate") return false;
+    setPhase("confirmed");
+    if (msgId) updateQuote(msgId, { state: "fired" });
+    push({
+      role: "assistant",
+      text: servedText(q),
+      signature: sig,
+    });
+    toast.success(`Served · ${shortAddr(sig, 6)}`);
+    return true;
   }
 
   async function runBalance() {
