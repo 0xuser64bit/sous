@@ -1,11 +1,82 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { callMcp } from "@/lib/mcp/client";
 import { unwrapMcp, toRows } from "@/lib/mcp/shapes";
 import { slotOf } from "@/lib/chain/slot";
 import { Section } from "@/components/layout/Section";
 import { DataRows, RowsSkeleton, RowsError, sidecarHint } from "@/components/layout/DataRows";
+
+const HISTORY_N = 40;
+
+function numSlot(s: string | null): number | null {
+  if (!s) return null;
+  const n = Number(s.replace(/,/g, ""));
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Chain throughput, honestly: slots per 15s poll, drawn from the same
+ * live health query below. No DAS, no fake history — the line starts
+ * empty and fills while you watch.
+ */
+function SlotSparkline({ slot }: { slot: number | null }) {
+  // Append-only history, adjusted during render (the documented
+  // derived-state pattern) so no effect-driven cascading renders.
+  const [prev, setPrev] = useState<number | null>(null);
+  const [hist, setHist] = useState<number[]>([]);
+  if (slot !== prev) {
+    setPrev(slot);
+    if (slot !== null && hist[hist.length - 1] !== slot) {
+      setHist([...hist.slice(-(HISTORY_N - 1)), slot]);
+    }
+  }
+
+  if (hist.length < 2) {
+    return (
+      <p className="font-mono text-[11px]" style={{ color: "var(--text-tertiary)" }}>
+        warming up the line — watch a poll or two…
+      </p>
+    );
+  }
+  const deltas = hist.slice(1).map((s, i) => s - hist[i]);
+  const max = Math.max(...deltas, 1);
+  const min = Math.min(...deltas, 0);
+  const span = Math.max(max - min, 1);
+  const W = 220;
+  const H = 36;
+  const pts = deltas
+    .map((d, i) => `${((i / (deltas.length - 1)) * W).toFixed(1)},${(H - 3 - ((d - min) / span) * (H - 6)).toFixed(1)}`)
+    .join(" ");
+  const last = deltas[deltas.length - 1];
+
+  return (
+    <figure>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="w-full"
+        role="img"
+        aria-label={`Chain throughput, latest ${last} slots per poll`}
+        preserveAspectRatio="none"
+        style={{ height: H }}
+      >
+        <polyline
+          points={pts}
+          fill="none"
+          stroke="var(--copper-bright)"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+      </svg>
+      <figcaption className="flex justify-between pt-1 font-mono text-[10.5px] tnum" style={{ color: "var(--text-tertiary)" }}>
+        <span>slots / 15s poll</span>
+        <span style={{ color: "var(--text-secondary)" }}>now {last}</span>
+      </figcaption>
+    </figure>
+  );
+}
 
 /**
  * The market board — chain pulse and pool listings. Ambient information
@@ -61,6 +132,9 @@ export function ActivityFeed() {
               )}
             </div>
             {healthRows && <DataRows rows={healthRows.rows} />}
+            <div className="pt-2">
+              <SlotSparkline slot={numSlot(slot)} />
+            </div>
           </div>
         )}
       </Section>

@@ -20,6 +20,7 @@ import {
   signMessageNeedsSignature,
   TxError,
 } from "@/lib/tx/signAndSend";
+import { cancelLimitOrder } from "@/lib/tx/cancelOrder";
 import { parseIntent, EXAMPLE_ORDERS, type Intent } from "@/lib/intent";
 import { QuoteTicket } from "./QuoteTicket";
 import { SousMark } from "@/components/brand/SousMark";
@@ -604,24 +605,21 @@ export function ChatPanel() {
     if (!needWallet()) return;
     setBusy(true);
     setError(null);
-    setPhase("quoting");
     try {
-      const res = await callMcp({ tool: "cancel_limit_order", wallet, args: { orderId } });
-      if (isNeedsSignature(res)) {
-        if (res.kind !== "transaction" || !res.transactionBase64) {
-          throw new TxError("failed", "Unexpected cancel payload from sidecar.");
-        }
-        setPhase("awaiting_signature");
-        toast("Approve in Nightly", { description: `Cancel order ${orderId}.` });
-        const sig = await signAndSubmitNeedsSignature(res, signTransaction!);
-        setSignature(sig);
+      const { signature } = await cancelLimitOrder({
+        orderId,
+        wallet,
+        signTransaction: signTransaction!,
+        onPhase: setPhase,
+      });
+      if (signature) {
+        setSignature(signature);
         setPhase("confirmed");
-        push({ role: "assistant", text: `Scrapped order ${orderId}.`, signature: sig });
-        toast.success("Order cancelled");
-        return;
+        push({ role: "assistant", text: `Scrapped order ${orderId}.`, signature });
+      } else {
+        setPhase("idle");
+        push({ role: "assistant", text: `Scrapped order ${orderId}.` });
       }
-      setPhase("idle");
-      push({ role: "assistant", text: `Scrapped order ${orderId} — ${str(unwrapMcp(res))}` });
       toast.success("Order cancelled");
     } catch (e) {
       if (e instanceof TxError && e.code === "rejected") {

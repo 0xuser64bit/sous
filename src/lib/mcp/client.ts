@@ -4,6 +4,7 @@
  * with x-cookie-wallet header, and gets back either data or
  * { status: 'needs_signature', transactionBase64, ... }.
  */
+import { unwrapMcp } from "./shapes";
 
 export type McpTool =
   | "chain_health"
@@ -55,7 +56,10 @@ export async function callMcp<T = unknown>(opts: {
     const text = await res.text().catch(() => "");
     throw new Error(`MCP ${opts.tool} failed (${res.status}): ${text}`);
   }
-  return res.json() as Promise<T | NeedsSignature>;
+  // Unwrap the JSON-RPC/content envelope here so every caller — and in
+  // particular every isNeedsSignature check — sees the real payload.
+  const json = await res.json();
+  return unwrapMcp(json) as T | NeedsSignature;
 }
 
 export function isNeedsSignature(v: unknown): v is NeedsSignature {
