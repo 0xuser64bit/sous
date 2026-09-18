@@ -4,15 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { WalletButton } from "@/components/wallet/WalletButton";
 import { SousMark } from "@/components/brand/SousMark";
 import { callMcp } from "@/lib/mcp/client";
+import { slotOf } from "@/lib/chain/slot";
 import { APP_TAGLINE } from "@/lib/chain/config";
-
-function slotOf(data: unknown): string | null {
-  if (!data || typeof data !== "object") return null;
-  const d = data as Record<string, unknown>;
-  const slot = d.slot;
-  if (typeof slot === "number" || typeof slot === "string") return String(slot);
-  return null;
-}
 
 function ChainPulse() {
   const { data } = useQuery({

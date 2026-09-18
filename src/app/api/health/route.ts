@@ -1,15 +1,18 @@
 import { NextResponse } from "next/server";
-import { Connection } from "@solana/web3.js";
+import { getConnection } from "@/lib/chain/connection";
+import { COOKIE_RPC_URL } from "@/lib/chain/config";
 
 export async function GET() {
-  const rpc = process.env.NEXT_PUBLIC_COOKIE_RPC_URL ?? "https://rpc.cookiescan.io";
   try {
-    const conn = new Connection(rpc, "confirmed");
-    const slot = await conn.getSlot();
-    return NextResponse.json({ ok: true, slot, rpc });
+    const slot = await getConnection().getSlot();
+    return NextResponse.json({ ok: true, slot, rpc: COOKIE_RPC_URL });
   } catch (e) {
     return NextResponse.json(
-      { ok: false, rpc, error: e instanceof Error ? e.message : "rpc error" },
+      {
+        ok: false,
+        rpc: COOKIE_RPC_URL,
+        error: e instanceof Error ? e.message : "rpc error",
+      },
       { status: 502 },
     );
   }

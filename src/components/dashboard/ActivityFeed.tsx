@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { callMcp } from "@/lib/mcp/client";
 import { unwrapMcp, toRows } from "@/lib/mcp/shapes";
-import { fmtNum, pickKey } from "@/lib/utils/format";
+import { slotOf } from "@/lib/chain/slot";
 import { Section } from "@/components/layout/Section";
 import { DataRows, RowsSkeleton, RowsError, sidecarHint } from "@/components/layout/DataRows";
 
@@ -30,7 +30,7 @@ export function ActivityFeed() {
   const healthPayload = health.data ? unwrapMcp(health.data) : null;
   const poolPayload = pools.data ? unwrapMcp(pools.data) : null;
 
-  const slot = slotOf(healthPayload);
+  const slot = health.data ? slotOf(health.data) : null;
   const live = slot !== null;
 
   const healthRows = healthPayload ? toRows(healthPayload, 4) : null;
@@ -82,12 +82,4 @@ export function ActivityFeed() {
       </div>
     </div>
   );
-}
-
-function slotOf(data: unknown): string | null {
-  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
-  const slot = pickKey(data as Record<string, unknown>, ["slot"]);
-  if (typeof slot === "number") return fmtNum(slot, 0);
-  if (typeof slot === "string" && slot.length < 24) return slot;
-  return null;
 }
