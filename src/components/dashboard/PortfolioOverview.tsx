@@ -5,7 +5,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { callMcp } from "@/lib/mcp/client";
-import { unwrapMcp, toRows } from "@/lib/mcp/shapes";
+import { unwrapMcp, toRows, balanceRows } from "@/lib/mcp/shapes";
 import { shortAddr } from "@/lib/utils/format";
 import { addressUrl } from "@/lib/chain/explorer";
 import { usePilotStore } from "@/lib/store/usePilotStore";
@@ -45,7 +45,7 @@ export function PortfolioOverview() {
     );
   }
 
-  const balRows = bal.data ? toRows(unwrapMcp(bal.data), 8) : null;
+  const balRows = bal.data ? balanceRows(bal.data) : null;
   const stakeRows = stake.data ? toRows(unwrapMcp(stake.data), 6) : null;
 
   return (

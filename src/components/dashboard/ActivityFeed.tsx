@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { callMcp } from "@/lib/mcp/client";
-import { unwrapMcp, toRows } from "@/lib/mcp/shapes";
+import { unwrapMcp, toRows, type DataRow } from "@/lib/mcp/shapes";
+import { pickKey, fmtNum } from "@/lib/utils/format";
 import { slotOf } from "@/lib/chain/slot";
 import { Section } from "@/components/layout/Section";
 import { DataRows, RowsSkeleton, RowsError, sidecarHint } from "@/components/layout/DataRows";
@@ -14,6 +15,38 @@ function numSlot(s: string | null): number | null {
   if (!s) return null;
   const n = Number(s.replace(/,/g, ""));
   return Number.isFinite(n) ? n : null;
+}
+
+/** Curated chain-health rows — the raw shape is deeply nested, so pick the
+ * few fields worth showing rather than dumping the object. */
+function healthRows(payload: unknown): DataRow[] {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return [];
+  const o = payload as Record<string, unknown>;
+  const rows: DataRow[] = [];
+  const tps = pickKey(o, ["slotsPerSec", "slots_per_sec"]);
+  if (typeof tps === "number") rows.push({ label: "throughput", value: `${tps.toFixed(2)} slot/s` });
+  const validators = pickKey(o, ["validatorCount", "clusterNodeCount"]);
+  const delinquent = pickKey(o, ["delinquentCount"]);
+  if (validators !== undefined) {
+    rows.push({
+      label: "validators",
+      value:
+        typeof delinquent === "number" && delinquent > 0
+          ? `${fmtNum(validators)} · ${fmtNum(delinquent)} delinquent`
+          : fmtNum(validators),
+    });
+  }
+  const epoch = pickKey(o, ["epoch"]);
+  const progress = pickKey(o, ["epochProgressPct", "epoch_progress_pct"]);
+  if (epoch !== undefined) {
+    rows.push({
+      label: "epoch",
+      value: typeof progress === "number" ? `${fmtNum(epoch)} · ${progress.toFixed(0)}%` : fmtNum(epoch),
+    });
+  }
+  const version = pickKey(o, ["version"]);
+  if (typeof version === "string") rows.push({ label: "version", value: version });
+  return rows;
 }
 
 /**
@@ -106,7 +139,7 @@ export function ActivityFeed() {
   const slot = health.data ? slotOf(health.data) : null;
   const live = slot !== null;
 
-  const healthRows = healthPayload ? toRows(healthPayload, 4) : null;
+  const healthDetail = healthPayload ? healthRows(healthPayload) : [];
   const poolRows = poolPayload ? toRows(poolPayload, 5) : null;
 
   return (
@@ -133,7 +166,7 @@ export function ActivityFeed() {
                 </span>
               )}
             </div>
-            {healthRows && <DataRows rows={healthRows.rows} />}
+            {healthDetail.length > 0 && <DataRows rows={healthDetail} />}
             <div className="pt-2">
               <SlotSparkline slot={numSlot(slot)} />
             </div>

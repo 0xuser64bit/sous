@@ -31,7 +31,7 @@ import {
   pickKey,
   isAddressLike,
 } from "@/lib/utils/format";
-import { unwrapMcp, toRows } from "@/lib/mcp/shapes";
+import { unwrapMcp, toRows, balanceRows } from "@/lib/mcp/shapes";
 import { txUrl, addressUrl } from "@/lib/chain/explorer";
 import { CHAIN_META, NATIVE_COOK_MINT } from "@/lib/chain/config";
 
@@ -633,7 +633,7 @@ export function ChatPanel() {
     setPhase("quoting");
     try {
       const res = await callMcp({ tool: "get_balance", wallet, args: { wallet } });
-      const { rows, more } = toRows(unwrapMcp(res));
+      const { rows, more } = balanceRows(res);
       push({
         role: "assistant",
         text: "",

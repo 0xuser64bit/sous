@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { shortAddr, fmtNum, pickKey } from "../utils/format";
-import { unwrapMcp, toRows, str, mcpErrorMessage } from "../mcp/shapes";
+import { unwrapMcp, toRows, str, mcpErrorMessage, balanceRows } from "../mcp/shapes";
 
 describe("format", () => {
   it("shortens addresses", () => {
@@ -48,6 +48,47 @@ describe("toRows", () => {
   it("str never throws on odd values", () => {
     expect(str(NaN)).toBe("—");
     expect(str(true)).toBe("yes");
+  });
+  it("does not recurse into empty nested arrays (keeps sibling fields)", () => {
+    // Regression: { cook:{…}, tokens:[] } used to render as nothing.
+    const rows = toRows({ cook: { amount: "5" }, tokens: [] }).rows;
+    expect(rows).toContainEqual({ label: "cook", value: "5" });
+  });
+  it("renders pool rows with base/quote pair + tvl (live shape)", () => {
+    const pools = {
+      count: 20,
+      totalPools: 168,
+      pools: [
+        {
+          poolId: "DmzxJyiCpoW9FC2iimG2fDm24LW5C8YbFtVJGVKrePkc",
+          venue: "COOKIESWAP CPAMM",
+          base: { mint: "Ek", symbol: "bCOOK" },
+          quote: { mint: "So", symbol: "wCOOK" },
+          tvlUsd: 1225.31,
+          volume24h: 1.3,
+        },
+      ],
+    };
+    expect(toRows(pools, 5).rows[0]).toEqual({ label: "bCOOK/wCOOK", value: "1,225.31" });
+  });
+});
+
+describe("balanceRows", () => {
+  it("keeps native COOK visible even when tokens[] is empty (live shape)", () => {
+    // Regression B2: the COOK balance was dropped by recursing into tokens[].
+    const raw = { wallet: "Ek", cook: { amount: "0.0014616", usdValue: 1e-7 }, tokens: [], totalUsd: 1e-7 };
+    expect(balanceRows(raw).rows).toEqual([{ label: "COOK", value: "0.0014616" }]);
+  });
+  it("lists COOK then each SPL token", () => {
+    const raw = {
+      cook: { amount: "12.5" },
+      tokens: [{ symbol: "bCOOK", uiAmount: "3.2" }, { mint: "XyZ", amount: "9" }],
+    };
+    expect(balanceRows(raw).rows).toEqual([
+      { label: "COOK", value: "12.5" },
+      { label: "bCOOK", value: "3.2" },
+      { label: "XyZ", value: "9" },
+    ]);
   });
 });
 
