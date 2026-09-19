@@ -8,6 +8,7 @@ try {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getSlot" }),
+    signal: AbortSignal.timeout(15_000),
   });
   const json = await res.json();
   console.log(`RPC ${rpc} slot:`, json.result ?? json);

@@ -193,6 +193,12 @@ export async function POST(req: NextRequest) {
   ) {
     return fail(400, "blockhash is not valid base58");
   }
+  if (
+    body.submit !== undefined &&
+    (typeof body.submit !== "object" || body.submit === null || Array.isArray(body.submit))
+  ) {
+    return fail(400, "submit must be a JSON object (the `submit` from needs_signature)");
+  }
 
   let bytes: Buffer;
   try {

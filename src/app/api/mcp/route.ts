@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     );
   }
-  if (body.args !== undefined && (typeof body.args !== "object" || body.args === null)) {
+  if (body.args !== undefined && (typeof body.args !== "object" || body.args === null || Array.isArray(body.args))) {
     return NextResponse.json({ error: "args must be a JSON object" }, { status: 400 });
   }
 
