@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { shortAddr, fmtNum, pickKey, trimAmount } from "../utils/format";
-import { unwrapMcp, toRows, str, mcpErrorMessage, balanceRows } from "../mcp/shapes";
+import { unwrapMcp, toRows, str, mcpErrorMessage, balanceRows, poolBoard } from "../mcp/shapes";
 
 describe("format", () => {
   it("shortens addresses", () => {
@@ -95,6 +95,25 @@ describe("balanceRows", () => {
       { label: "bCOOK", value: "3.2" },
       { label: "XyZ", value: "9" },
     ]);
+  });
+});
+
+describe("poolBoard", () => {
+  it("disambiguates same-pair pools by venue (live shape)", () => {
+    const payload = {
+      count: 20,
+      pools: [
+        { poolId: "Dmzx", venue: "COOKIESWAP CPAMM", base: { symbol: "bCOOK" }, quote: { symbol: "wCOOK" }, tvlUsd: 1222.34 },
+        { poolId: "GHfz", venue: "COOKIEBOX DAMM", base: { symbol: "bCOOK" }, quote: { symbol: "wCOOK" }, tvlUsd: 900.1 },
+      ],
+    };
+    const { rows, more } = poolBoard(payload, 5);
+    expect(rows.map((r) => r.label)).toEqual([
+      "bCOOK/wCOOK · COOKIESWAP CPAMM",
+      "bCOOK/wCOOK · COOKIEBOX DAMM",
+    ]);
+    expect(new Set(rows.map((r) => r.label)).size).toBe(rows.length);
+    expect(more).toBe(0);
   });
 });
 

@@ -12,9 +12,9 @@ export function DataRows({ rows, more }: { rows: DataRow[]; more?: number }) {
   return (
     <div>
       <dl>
-        {rows.map((r) => (
+        {rows.map((r, i) => (
           <div
-            key={r.label}
+            key={`${r.label}-${i}`}
             className="flex items-baseline justify-between gap-3 py-1 text-[12.5px]"
           >
             <dt className="min-w-0 truncate" style={{ color: "var(--text-secondary)" }}>

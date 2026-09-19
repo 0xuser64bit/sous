@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { callMcp } from "@/lib/mcp/client";
-import { unwrapMcp, toRows, type DataRow } from "@/lib/mcp/shapes";
+import { unwrapMcp, poolBoard, type DataRow } from "@/lib/mcp/shapes";
 import { pickKey, fmtNum } from "@/lib/utils/format";
 import { slotOf } from "@/lib/chain/slot";
 import { Section } from "@/components/layout/Section";
@@ -140,7 +140,7 @@ export function ActivityFeed() {
   const live = slot !== null;
 
   const healthDetail = healthPayload ? healthRows(healthPayload) : [];
-  const poolRows = poolPayload ? toRows(poolPayload, 5) : null;
+  const board = poolPayload ? poolBoard(poolPayload, 5) : null;
 
   return (
     <div className="flex flex-col">
@@ -180,8 +180,8 @@ export function ActivityFeed() {
             <RowsSkeleton lines={3} />
           ) : pools.isError ? (
             <RowsError message={sidecarHint(pools.error.message)} onRetry={() => void pools.refetch()} />
-          ) : poolRows && poolRows.rows.length ? (
-            <DataRows rows={poolRows.rows} more={poolRows.more} />
+          ) : board && board.rows.length ? (
+            <DataRows rows={board.rows} more={board.more} />
           ) : (
             <p className="text-[12.5px]" style={{ color: "var(--text-tertiary)" }}>
               No pools on the board.

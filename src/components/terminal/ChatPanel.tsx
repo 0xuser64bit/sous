@@ -899,8 +899,8 @@ function LedgerTable({ table }: { table: TableData }) {
         )}
       </div>
       <dl className="px-3 pb-2.5">
-        {table.rows.map((r) => (
-          <div key={r.label} className="flex items-baseline justify-between gap-3 border-t border-[var(--border-subtle)] py-1.5 text-[12.5px] first:border-t-0">
+        {table.rows.map((r, i) => (
+          <div key={`${r.label}-${i}`} className="flex items-baseline justify-between gap-3 border-t border-[var(--border-subtle)] py-1.5 text-[12.5px] first:border-t-0">
             <dt className="min-w-0 truncate" style={{ color: "var(--text-secondary)" }}>
               {r.label}
             </dt>

@@ -198,6 +198,33 @@ export function toRows(data: unknown, max = 8): { rows: DataRow[]; more: number 
 }
 
 /**
+ * Pool board rows. Several pools share the same base/quote pair (e.g. two
+ * bCOOK/wCOOK pools on different venues), so the venue rides in the label —
+ * otherwise the board shows identical rows and React keys collide.
+ */
+export function poolBoard(payload: unknown, max = 5): { rows: DataRow[]; more: number } {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return { rows: [], more: 0 };
+  }
+  const list = pickKey(payload as Record<string, unknown>, ["pools"]);
+  if (!Array.isArray(list)) return { rows: [], more: 0 };
+  const rows = list.slice(0, max).map((item): DataRow => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      return { label: "pool", value: "—" };
+    }
+    const o = item as Record<string, unknown>;
+    const pair = pairLabel(o) ?? str(pickKey(o, ["poolId", "address", "id"]));
+    const venue = pickKey(o, ["venue"]);
+    const tvl = pickKey(o, ["tvlUsd", "tvl", "liquidityUsd"]);
+    return {
+      label: typeof venue === "string" && venue ? `${pair} · ${venue}` : pair,
+      value: tvl === undefined || tvl === null ? "—" : str(tvl),
+    };
+  });
+  return { rows, more: Math.max(0, list.length - max) };
+}
+
+/**
  * get_balance → rows, native COOK first then each SPL token. The native
  * `cook` balance is a sibling of `tokens[]`, so the generic list-or-map
  * heuristic would drop it whenever `tokens` is present (or empty) — this
