@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SousMark } from "@/components/brand/SousMark";
+import { DemoTheater } from "@/components/landing/DemoTheater";
 import {
   APP_TAGLINE,
   CHAIN_META,
@@ -14,34 +15,6 @@ function rpcHost(): string {
     return COOKIE_RPC_URL;
   }
 }
-
-const DEMO_STEPS = [
-  {
-    n: "01",
-    title: "Connect Nightly",
-    text: "Your address, a live dot, and a way out — the hook by the pass door. Browsing stays free until you sign.",
-  },
-  {
-    n: "02",
-    title: "Quote in words",
-    text: "\u201CQuote 10 COOK \u2192 bCOOK\u201D returns a paper ticket with venue, impact, and fee. Nothing is signed yet.",
-  },
-  {
-    n: "03",
-    title: "Approve once",
-    text: "One signature in Nightly. The expo strip walks Quoted \u2192 Signature \u2192 Confirming \u2192 Served, and lands a Cookiescan receipt.",
-  },
-  {
-    n: "04",
-    title: "Work the pantry",
-    text: "Stake 5 COOK, rest a limit order, scrap it. Standing orders live on one board — the pass and the pantry never disagree.",
-  },
-  {
-    n: "05",
-    title: "Taste the edge",
-    text: "Five transactions, under a cent, in seconds. Micro-trading only works when finality and fees disappear.",
-  },
-] as const;
 
 const HOW_ROWS = [
   {
@@ -243,37 +216,26 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* ── 60-second demo ───────────────────────────────── */}
+        {/* ── 60-second flow: the theater ──────────────────── */}
         <section aria-labelledby="demo-title" id="demo" className="scroll-mt-20" style={{ borderTop: "1px solid var(--border-subtle)" }}>
           <div className="mx-auto w-full max-w-[1200px] px-4 py-16 sm:py-20">
             <p className="font-mono text-[11px] uppercase tracking-[0.18em]" style={{ color: "var(--copper-bright)" }}>
-              The 60-second demo
+              Simulated preview · the 60-second flow
             </p>
             <h2
               id="demo-title"
               className="font-display mt-3 max-w-[22ch] font-semibold leading-[1.1]"
               style={{ fontSize: "clamp(1.75rem, 4vw, 2.5rem)", letterSpacing: "-0.01em" }}
             >
-              Five steps. Under a cent. Then you believe it.
+              Watch an order go from words to receipt.
             </h2>
-            <ol className="mt-10">
-              {DEMO_STEPS.map((s) => (
-                <li
-                  key={s.n}
-                  className="grid gap-1 border-t border-[var(--border-subtle)] py-5 sm:grid-cols-12 sm:gap-6"
-                >
-                  <span className="font-mono text-[13px] tnum sm:col-span-2" style={{ color: "var(--copper-bright)" }}>
-                    {s.n}
-                  </span>
-                  <div className="sm:col-span-10 lg:max-w-[62ch]">
-                    <h3 className="text-[16px] font-semibold">{s.title}</h3>
-                    <p className="mt-1.5 text-[15px] leading-[1.7]" style={{ color: "var(--text-secondary)" }}>
-                      {s.text}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ol>
+            <p className="mt-4 max-w-[62ch] text-[16px] leading-[1.7]" style={{ color: "var(--text-secondary)" }}>
+              Read-only, start to receipt, on loop. No wallet, no network —
+              the live pass is one click away in the app.
+            </p>
+            <div className="mt-10">
+              <DemoTheater />
+            </div>
           </div>
         </section>
 
