@@ -19,12 +19,12 @@ export default function Error({
   }, [error]);
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-4 text-center">
+    <div className="flex min-h-dvh flex-col items-center justify-center gap-4 px-6 py-16 text-center">
       <SousMark size={44} />
-      <h1 className="font-display text-[28px] font-semibold">
+      <h1 className="font-display text-balance text-[clamp(1.5rem,6vw,1.75rem)] font-semibold">
         Dropped the ticket.
       </h1>
-      <p className="max-w-sm text-[14px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+      <p className="max-w-sm text-balance text-[14px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
         Something burnt on the pass
         {error.digest ? (
           <>
@@ -37,7 +37,7 @@ export default function Error({
       </p>
       <button
         onClick={reset}
-        className="rounded-[var(--radius-md)] px-4 py-2.5 text-[13.5px] font-semibold transition-opacity hover:opacity-85"
+        className="flex min-h-[48px] items-center justify-center rounded-[var(--radius-md)] px-6 py-2.5 text-[13.5px] font-semibold transition-opacity hover:opacity-85"
         style={{ background: "var(--copper)", color: "#1d1206" }}
       >
         Fire it again

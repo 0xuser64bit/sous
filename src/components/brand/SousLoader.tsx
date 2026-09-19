@@ -9,9 +9,9 @@ const STEPS = ["Preheating", "Tasting", "Plating"] as const;
 export function SousLoader({ step = 0 }: { step?: number }) {
   const active = Math.min(Math.max(step, 0), STEPS.length - 1);
   return (
-    <div className="flex items-center gap-3" role="status" aria-live="polite">
+    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5" role="status" aria-live="polite">
       <SousMark size={22} />
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
         {STEPS.map((label, i) => (
           <span key={label} className="flex items-center gap-2">
             <span

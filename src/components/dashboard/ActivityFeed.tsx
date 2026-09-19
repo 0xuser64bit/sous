@@ -87,10 +87,10 @@ function SlotSparkline({ slot }: { slot: number | null }) {
   const last = deltas[deltas.length - 1];
 
   return (
-    <figure>
+    <figure className="min-w-0">
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        className="w-full"
+        className="block w-full"
         role="img"
         aria-label={`Chain throughput, latest ${last} slots per poll`}
         preserveAspectRatio="none"
@@ -143,25 +143,25 @@ export function ActivityFeed() {
   const board = poolPayload ? poolBoard(poolPayload, 5) : null;
 
   return (
-    <div className="flex flex-col">
+    <div className="flex min-w-0 flex-col">
       <Section label="Chain">
         {health.isPending ? (
           <RowsSkeleton lines={2} />
         ) : health.isError ? (
           <RowsError message={sidecarHint(health.error.message)} onRetry={() => void health.refetch()} />
         ) : (
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-2 pb-1">
+          <div className="flex min-w-0 flex-col gap-1">
+            <div className="flex min-w-0 items-center gap-2 pb-1">
               <span
                 aria-hidden
-                className={`inline-block h-1.5 w-1.5 rounded-full ${live ? "animate-live" : ""}`}
+                className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${live ? "animate-live" : ""}`}
                 style={{ background: live ? "var(--success)" : "var(--text-tertiary)" }}
               />
               <span className="font-mono text-[12px] tnum" style={{ color: "var(--text-primary)" }}>
                 {live ? "Live" : "Quiet"}
               </span>
               {slot && (
-                <span className="ml-auto font-mono text-[12px] tnum" style={{ color: "var(--text-tertiary)" }}>
+                <span className="ml-auto min-w-0 truncate font-mono text-[12px] tnum" style={{ color: "var(--text-tertiary)" }}>
                   slot {slot}
                 </span>
               )}

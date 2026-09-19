@@ -34,15 +34,43 @@ export function TxPass() {
     <div
       role="status"
       aria-live="polite"
-      className="shrink-0 px-4 py-2.5"
+      className="shrink-0 px-3 py-2.5 sm:px-4"
       style={{
         borderTop: "1px solid var(--border-subtle)",
         background: failed ? "var(--error-dim)" : "var(--bg-inset)",
       }}
     >
       <div className="mx-auto flex max-w-2xl items-center gap-2 text-[11.5px]">
-        {/* Stations */}
-        <ol className="flex min-w-0 flex-1 items-center gap-1.5" aria-label="Order progress">
+        {/* Compact station readout on phones: current step + count */}
+        <div
+          className="flex min-w-0 flex-1 items-center gap-2 min-[480px]:hidden"
+          aria-label="Order progress"
+        >
+          <span
+            aria-hidden
+            className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${!failed && active >= 0 ? "animate-live" : ""}`}
+            style={{
+              background: failed
+                ? "var(--error)"
+                : active >= 0
+                  ? "var(--copper-bright)"
+                  : "var(--text-tertiary)",
+            }}
+          />
+          <span
+            className="min-w-0 truncate font-medium"
+            style={{ color: failed ? "var(--error)" : "var(--text-primary)" }}
+          >
+            {failed
+              ? (lastError ?? "Order failed")
+              : active >= 0
+                ? `${STATIONS[active].label} · ${active + 1}/4`
+                : "Served · 4/4"}
+          </span>
+        </div>
+
+        {/* Full station strip on sm+ */}
+        <ol className="hidden min-w-0 flex-1 items-center gap-1.5 min-[480px]:flex" aria-label="Order progress">
           {STATIONS.map((s, i) => {
             const done = !failed && (i < active || txPhase === "confirmed");
             const current = !failed && i === active;
@@ -78,7 +106,7 @@ export function TxPass() {
         </ol>
 
         {failed && (
-          <span className="min-w-0 flex-1 truncate font-mono text-[11px]" style={{ color: "var(--error)" }}>
+          <span className="hidden min-w-0 flex-1 truncate font-mono text-[11px] min-[480px]:block" style={{ color: "var(--error)" }}>
             {lastError ?? "Order failed"}
           </span>
         )}
@@ -88,17 +116,17 @@ export function TxPass() {
             href={txUrl(lastSignature)}
             target="_blank"
             rel="noreferrer"
-            className="shrink-0 font-mono text-[11px] tnum transition-opacity hover:opacity-70"
+            className="flex min-h-[32px] shrink-0 items-center font-mono text-[11px] tnum transition-opacity hover:opacity-70"
             style={{ color: "var(--copper-bright)" }}
           >
-            {shortAddr(lastSignature, 6)} ↗
+            {shortAddr(lastSignature, 4)} ↗
           </a>
         )}
 
         {(txPhase === "confirmed" || failed) && (
           <button
             onClick={resetTx}
-            className="shrink-0 transition-opacity hover:opacity-70"
+            className="flex min-h-[32px] shrink-0 items-center px-1 transition-opacity hover:opacity-70"
             style={{ color: "var(--text-tertiary)" }}
           >
             Clear

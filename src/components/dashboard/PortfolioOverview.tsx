@@ -49,23 +49,23 @@ export function PortfolioOverview() {
   const stakeRows = stake.data ? toRows(unwrapMcp(stake.data), 6) : null;
 
   return (
-    <div className="flex flex-col">
+    <div className="flex min-w-0 flex-col">
       {/* Wallet shelf-mark */}
-      <div className="flex items-center gap-2 px-4 pb-1 pt-4">
+      <div className="flex min-w-0 items-center gap-2 px-3 pb-1 pt-4 sm:px-4">
         <span
           aria-hidden
-          className="inline-block h-1.5 w-1.5 rounded-full"
+          className="inline-block h-1.5 w-1.5 shrink-0 rounded-full"
           style={{ background: "var(--success)" }}
         />
         <a
           href={addressUrl(wallet)}
           target="_blank"
           rel="noreferrer"
-          className="font-mono text-[12px] tnum transition-opacity hover:opacity-70"
+          className="flex min-h-[32px] min-w-0 flex-1 items-center truncate font-mono text-[12px] tnum transition-opacity hover:opacity-70"
           style={{ color: "var(--text-secondary)" }}
           title={wallet}
         >
-          {shortAddr(wallet, 6)} ↗
+          <span className="truncate">{shortAddr(wallet, 6)} ↗</span>
         </a>
       </div>
 
@@ -124,7 +124,7 @@ function RefreshButton({
       onClick={onClick}
       aria-label={label}
       title={label}
-      className="font-mono text-[11px] transition-opacity hover:opacity-70 disabled:opacity-40"
+      className="flex min-h-[36px] min-w-[36px] items-center justify-center font-mono text-[13px] transition-opacity hover:opacity-70 disabled:opacity-40"
       style={{ color: "var(--text-tertiary)" }}
       disabled={spinning}
     >
@@ -173,7 +173,7 @@ function StakeActions() {
   }
 
   return (
-    <div className="mt-3 flex items-center gap-2">
+    <div className="mt-3 flex flex-wrap items-center gap-2">
       <label htmlFor="stake-amount" className="sr-only">
         Amount to stake or unstake
       </label>
@@ -183,27 +183,29 @@ function StakeActions() {
         onChange={(e) => setAmount(e.target.value)}
         inputMode="decimal"
         placeholder="Amount"
-        className="w-24 rounded-[var(--radius-md)] px-2.5 py-1.5 font-mono text-[12.5px] tnum outline-none transition-colors placeholder:text-[var(--text-tertiary)]"
+        className="h-[44px] w-full min-w-0 flex-1 rounded-[var(--radius-md)] px-2.5 py-1.5 font-mono text-[12.5px] tnum outline-none transition-colors placeholder:text-[var(--text-tertiary)] min-[420px]:w-24 min-[420px]:flex-none sm:h-auto"
         style={{
           background: "var(--bg-inset)",
           border: "1px solid var(--border)",
           color: "var(--text-primary)",
         }}
       />
-      <button
-        onClick={() => write("stake")}
-        className="rounded-[var(--radius-md)] px-3 py-1.5 text-[12.5px] font-semibold transition-opacity hover:opacity-85"
-        style={{ background: "var(--copper)", color: "#1d1206" }}
-      >
-        Stake
-      </button>
-      <button
-        onClick={() => write("unstake")}
-        className="rounded-[var(--radius-md)] px-3 py-1.5 text-[12.5px] font-medium transition-opacity hover:opacity-70"
-        style={{ color: "var(--text-secondary)", border: "1px solid var(--border)" }}
-      >
-        Unstake
-      </button>
+      <div className="flex w-full gap-2 min-[420px]:w-auto">
+        <button
+          onClick={() => write("stake")}
+          className="flex min-h-[44px] flex-1 items-center justify-center rounded-[var(--radius-md)] px-4 py-1.5 text-[12.5px] font-semibold transition-opacity hover:opacity-85 min-[420px]:flex-none sm:min-h-0 sm:px-3"
+          style={{ background: "var(--copper)", color: "#1d1206" }}
+        >
+          Stake
+        </button>
+        <button
+          onClick={() => write("unstake")}
+          className="flex min-h-[44px] flex-1 items-center justify-center rounded-[var(--radius-md)] px-4 py-1.5 text-[12.5px] font-medium transition-opacity hover:opacity-70 min-[420px]:flex-none sm:min-h-0 sm:px-3"
+          style={{ color: "var(--text-secondary)", border: "1px solid var(--border)" }}
+        >
+          Unstake
+        </button>
+      </div>
     </div>
   );
 }

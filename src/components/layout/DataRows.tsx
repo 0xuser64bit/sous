@@ -10,19 +10,20 @@ export function DataRows({ rows, more }: { rows: DataRow[]; more?: number }) {
     );
   }
   return (
-    <div>
+    <div className="min-w-0">
       <dl>
         {rows.map((r, i) => (
           <div
             key={`${r.label}-${i}`}
-            className="flex items-baseline justify-between gap-3 py-1 text-[12.5px]"
+            className="flex items-baseline justify-between gap-3 py-1.5 text-[12.5px]"
           >
-            <dt className="min-w-0 truncate" style={{ color: "var(--text-secondary)" }}>
+            <dt className="min-w-0 flex-1 truncate" style={{ color: "var(--text-secondary)" }} title={r.label}>
               {r.label}
             </dt>
             <dd
-              className="shrink-0 truncate font-mono tnum"
-              style={{ color: "var(--text-primary)", maxWidth: "55%" }}
+              className="max-w-[55%] shrink-0 truncate text-right font-mono tnum"
+              style={{ color: "var(--text-primary)" }}
+              title={r.value}
             >
               {r.value}
             </dd>
@@ -55,13 +56,13 @@ export function RowsSkeleton({ lines = 3 }: { lines?: number }) {
 
 export function RowsError({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <div className="flex flex-col gap-1.5 py-1">
-      <p className="font-mono text-[11.5px] leading-relaxed" style={{ color: "var(--error)" }}>
+    <div className="flex min-w-0 flex-col gap-1.5 py-1">
+      <p className="font-mono text-[11.5px] leading-relaxed break-words" style={{ color: "var(--error)" }}>
         {message.length > 140 ? `${message.slice(0, 140)}…` : message}
       </p>
       <button
         onClick={onRetry}
-        className="self-start text-[12px] font-medium transition-opacity hover:opacity-70"
+        className="flex min-h-[36px] items-center self-start text-[12px] font-medium transition-opacity hover:opacity-70"
         style={{ color: "var(--copper-bright)" }}
       >
         Retry →

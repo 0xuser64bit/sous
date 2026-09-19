@@ -18,10 +18,14 @@ const STATIONS = ["Quoted", "Signature", "Confirming", "Served"] as const;
 
 function TicketLine({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
-    <div className="flex items-end gap-2">
+    <div className="flex items-baseline gap-2">
       <dt className="shrink-0" style={{ color: "var(--ink-soft)" }}>{label}</dt>
-      <span aria-hidden className="leader mb-1 min-w-4 flex-1" />
-      <dd className={`shrink-0 font-mono tnum ${strong ? "font-semibold" : ""}`} style={{ color: "var(--ink)" }}>
+      <span aria-hidden className="leader mb-1 min-w-3 flex-1 sm:min-w-4" />
+      <dd
+        className={`min-w-0 max-w-[58%] truncate text-right font-mono tnum ${strong ? "font-semibold" : ""}`}
+        style={{ color: "var(--ink)" }}
+        title={value}
+      >
         {value}
       </dd>
     </div>
@@ -84,27 +88,27 @@ export function DemoTheater() {
   const showReceipt = fired;
 
   return (
-    <div className="grid items-start gap-8 lg:grid-cols-12 lg:gap-10">
+    <div className="grid min-w-0 items-start gap-6 sm:gap-8 lg:grid-cols-12 lg:gap-10">
       {/* Stage */}
       <div
         ref={boxRef}
         role="region"
         aria-label="Simulated demo: a swap order traveling from words to receipt. Read-only preview."
-        className="overflow-hidden rounded-[var(--radius-md)] lg:col-span-7"
+        className="min-w-0 overflow-hidden rounded-[var(--radius-md)] lg:col-span-7"
         style={{ background: "var(--bg-raised)", border: "1px solid var(--border)" }}
       >
         <div
-          className="flex items-center gap-2 px-4 py-2.5"
+          className="flex min-w-0 items-center gap-2 px-3 py-2.5 sm:px-4"
           style={{ borderBottom: "1px solid var(--border-subtle)" }}
         >
-          <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: "var(--text-tertiary)" }} />
-          <span className="font-mono text-[11px]" style={{ color: "var(--text-tertiary)" }}>
+          <span aria-hidden className="inline-block h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--text-tertiary)" }} />
+          <span className="min-w-0 flex-1 truncate font-mono text-[11px]" style={{ color: "var(--text-tertiary)" }}>
             Simulated preview · read-only
           </span>
           {!reduced && (
             <button
               onClick={() => dispatch({ type: "reset" })}
-              className="ml-auto font-mono text-[11px] transition-opacity hover:opacity-70"
+              className="flex min-h-[36px] shrink-0 items-center px-1 font-mono text-[11px] transition-opacity hover:opacity-70"
               style={{ color: "var(--text-tertiary)" }}
               aria-label="Replay the simulated demo"
             >
@@ -113,14 +117,14 @@ export function DemoTheater() {
           )}
         </div>
 
-        <div aria-hidden="true" className="flex min-h-[360px] flex-col gap-4 px-4 py-5">
+        <div aria-hidden="true" className="flex min-h-[300px] min-w-0 flex-col gap-4 px-3 py-5 sm:min-h-[360px] sm:px-4">
           {showBubble && (
-            <div className="animate-ticket-in ml-auto max-w-[88%]">
-              <div className="mb-1 text-right font-mono text-[10px] uppercase tracking-[0.12em]" style={{ color: "var(--text-tertiary)" }}>
+            <div className="animate-ticket-in ml-auto max-w-[92%] sm:max-w-[88%]">
+              <div className="mb-1 truncate text-right font-mono text-[10px] uppercase tracking-[0.12em]" style={{ color: "var(--text-tertiary)" }}>
                 No. 004 · Swap · 14:32
               </div>
               <div
-                className="rounded-[var(--radius-md)] px-3 py-2 text-[13.5px] leading-relaxed"
+                className="rounded-[var(--radius-md)] px-3 py-2 text-[13.5px] leading-relaxed break-words"
                 style={{ background: "var(--bg-inset)", border: "1px solid var(--border)" }}
               >
                 {DEMO_TEXT}
@@ -136,30 +140,30 @@ export function DemoTheater() {
 
           {showTicket && (
             <div
-              className="animate-ticket-in overflow-hidden rounded-[var(--radius-md)]"
+              className="animate-ticket-in min-w-0 overflow-hidden rounded-[var(--radius-md)]"
               style={{ background: "var(--paper)", color: "var(--ink)" }}
             >
-              <div className="flex items-baseline justify-between gap-2 px-4 pt-3">
-                <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--ink-soft)" }}>
+              <div className="flex items-baseline justify-between gap-2 px-3 pt-3 sm:px-4">
+                <span className="min-w-0 truncate font-mono text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--ink-soft)" }}>
                   Order No. 004 · Tasting
                 </span>
-                <span className="font-mono text-[10px] tnum" style={{ color: "var(--ink-faint)" }}>
+                <span className="shrink-0 font-mono text-[10px] tnum" style={{ color: "var(--ink-faint)" }}>
                   14:32
                 </span>
               </div>
-              <div className="px-4 pb-1 pt-2">
-                <p className="font-display text-[22px] font-semibold leading-tight">
+              <div className="px-3 pb-1 pt-2 sm:px-4">
+                <p className="font-display break-words text-[20px] font-semibold leading-tight sm:text-[22px]">
                   10 COOK <span style={{ color: "var(--ink-faint)" }}>→</span> bCOOK
                 </p>
               </div>
-              <dl className="space-y-1.5 px-4 py-3 text-[12.5px]">
+              <dl className="space-y-1.5 px-3 py-3 text-[12.5px] sm:px-4">
                 <TicketLine label="You fire" value="10 COOK" strong />
                 <TicketLine label="You receive" value="9.982 bCOOK" strong />
                 <TicketLine label="Venue" value="Cookiebox · Candy Shop" />
                 <TicketLine label="Est. fee" value={`≈ ${CHAIN_META.avgFeeCook} COOK`} />
               </dl>
               {fired ? (
-                <div className="px-4 pb-3">
+                <div className="px-3 pb-3 sm:px-4">
                   <span
                     className="inline-block -rotate-2 rounded-[3px] border px-2 py-0.5 font-mono text-[11px] font-bold uppercase tracking-[0.12em]"
                     style={{ borderColor: "var(--copper-deep)", color: "var(--copper-deep)" }}
@@ -168,15 +172,15 @@ export function DemoTheater() {
                   </span>
                 </div>
               ) : (
-                <div className="flex gap-2 px-4 pb-4 pt-1">
+                <div className="flex gap-2 px-3 pb-4 pt-1 sm:px-4">
                   <span
-                    className="flex-1 rounded-[var(--radius-sm)] px-3 py-2 text-center text-[13px] font-semibold"
+                    className="flex min-h-[44px] flex-1 items-center justify-center rounded-[var(--radius-sm)] px-3 py-2 text-center text-[13px] font-semibold sm:min-h-0"
                     style={{ background: "var(--ink)", color: "var(--paper)" }}
                   >
                     Fire order
                   </span>
                   <span
-                    className="rounded-[var(--radius-sm)] px-3 py-2 text-[13px] font-medium"
+                    className="flex min-h-[44px] items-center justify-center rounded-[var(--radius-sm)] px-4 py-2 text-[13px] font-medium sm:min-h-0 sm:px-3"
                     style={{ color: "var(--ink-soft)", border: "1px solid var(--paper-faint)" }}
                   >
                     Pass
@@ -239,12 +243,12 @@ export function DemoTheater() {
         {/* Mock dock: the typing hand */}
         <div
           aria-hidden="true"
-          className="px-4 pb-4 pt-1"
+          className="px-3 pb-4 pt-1 sm:px-4"
           style={{ borderTop: "1px solid var(--border-subtle)" }}
         >
-          <div className="mx-auto flex max-w-2xl items-end gap-2 pt-3">
+          <div className="mx-auto flex max-w-2xl min-w-0 items-end gap-2 pt-3">
             <div
-              className="min-h-[42px] flex-1 rounded-[var(--radius-md)] px-3 py-2.5 text-[13.5px] leading-relaxed"
+              className="flex min-h-[44px] min-w-0 flex-1 items-center rounded-[var(--radius-md)] px-3 py-2.5 text-[13.5px] leading-relaxed break-words"
               style={{
                 background: "var(--bg-inset)",
                 border: "1px solid var(--border)",
@@ -263,7 +267,7 @@ export function DemoTheater() {
               )}
             </div>
             <span
-              className="shrink-0 rounded-[var(--radius-md)] px-4 py-2.5 text-[13.5px] font-semibold opacity-60"
+              className="flex min-h-[44px] shrink-0 items-center rounded-[var(--radius-md)] px-4 py-2.5 text-[13.5px] font-semibold opacity-60"
               style={{ background: "var(--copper)", color: "#1d1206" }}
             >
               Fire
@@ -273,28 +277,28 @@ export function DemoTheater() {
       </div>
 
       {/* Captions: the story, readable by everyone */}
-      <ol className="flex flex-col lg:col-span-5" aria-label="What the demo shows">
+      <ol className="flex min-w-0 flex-col lg:col-span-5" aria-label="What the demo shows">
         {DEMO_CAPTIONS.map((c, i) => {
           const active = i === activeCaption;
           const past = i < activeCaption;
           return (
-            <li key={c.title} className="border-t border-[var(--border-subtle)] py-4 first:border-t-0 first:pt-0 lg:first:pt-0">
-              <p className="flex items-baseline gap-3">
+            <li key={c.title} className="min-w-0 border-t border-[var(--border-subtle)] py-4 first:border-t-0 first:pt-0 lg:first:pt-0">
+              <p className="flex min-w-0 items-baseline gap-3">
                 <span
-                  className="font-mono text-[12px] tnum"
+                  className="shrink-0 font-mono text-[12px] tnum"
                   style={{ color: active ? "var(--copper-bright)" : "var(--text-tertiary)" }}
                 >
                   {String(i + 1).padStart(2, "0")}
                 </span>
                 <span
-                  className="text-[15px] font-semibold"
+                  className="min-w-0 text-balance text-[15px] font-semibold break-words"
                   style={{ color: active || past ? "var(--text-primary)" : "var(--text-tertiary)" }}
                 >
                   {c.title}
                 </span>
               </p>
               <p
-                className="mt-1.5 pl-9 text-[14px] leading-[1.7]"
+                className="mt-1.5 pl-8 text-[14px] leading-[1.7] break-words sm:pl-9"
                 style={{ color: active ? "var(--text-secondary)" : "var(--text-tertiary)" }}
               >
                 {c.text}

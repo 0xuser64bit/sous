@@ -144,6 +144,10 @@ export function ChatPanel() {
 
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  // Mobile ideas toggle: the chip row costs ~44px of feed height, so once
+  // the user is trading it collapses behind one button. Empty pass keeps
+  // the row open — that's when discovery matters.
+  const [ideasOpen, setIdeasOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const areaRef = useRef<HTMLTextAreaElement>(null);
   // Reader protection: only yank the feed to the bottom when the user is
@@ -680,8 +684,8 @@ export function ChatPanel() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* Feed */}
-      <div ref={scrollRef} onScroll={onFeedScroll} className="min-h-0 flex-1 overflow-y-auto px-4 py-5" aria-live="polite">
-        <div className="mx-auto flex max-w-2xl flex-col gap-4">
+      <div ref={scrollRef} onScroll={onFeedScroll} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 sm:px-4 sm:py-5" aria-live="polite">
+        <div className="mx-auto flex max-w-2xl flex-col gap-3 sm:gap-4">
           {showHero ? (
             <Hero connected={Boolean(publicKey)} />
           ) : (
@@ -703,15 +707,35 @@ export function ChatPanel() {
       </div>
 
       {/* Dock — pinned. Suggestions ride above the composer, AI-terminal style. */}
-      <div className="shrink-0 px-4 pb-4 pt-2" style={{ borderTop: "1px solid var(--border-subtle)" }}>
-        <div className="mx-auto flex max-w-2xl flex-col gap-2">
-          <div className="flex flex-wrap gap-1.5" aria-label="Suggestions">
+      <div
+        className="shrink-0 px-3 pb-4 pt-2 sm:px-4"
+        style={{
+          borderTop: "1px solid var(--border-subtle)",
+          paddingBottom: "max(1rem, env(safe-area-inset-bottom, 0px))",
+        }}
+      >
+        <div className="mx-auto flex max-w-2xl flex-col gap-1.5 lg:gap-2">
+          {/* Mobile ideas toggle — hidden on sm+ where the row always shows */}
+          {!showHero && (
+            <button
+              onClick={() => setIdeasOpen((v) => !v)}
+              aria-expanded={ideasOpen}
+              className="flex min-h-[32px] items-center gap-1.5 self-start font-mono text-[10.5px] transition-opacity hover:opacity-70 sm:hidden"
+              style={{ color: "var(--text-tertiary)" }}
+            >
+              {ideasOpen ? "Hide ideas ▴" : "Try an idea ▾"}
+            </button>
+          )}
+          <div
+            className={`${!showHero && !ideasOpen ? "hidden" : "flex"} gap-1.5 overflow-x-auto pb-1 sm:flex sm:flex-wrap sm:overflow-visible sm:pb-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}
+            aria-label="Suggestions"
+          >
             {EXAMPLE_ORDERS.map((o) => (
               <button
                 key={o}
                 onClick={() => void onSend(o)}
                 disabled={busy}
-                className="rounded-full px-2.5 py-1 font-mono text-[11px] transition-colors disabled:opacity-40"
+                className="min-h-[32px] shrink-0 rounded-full px-2.5 py-1 font-mono text-[10.5px] transition-colors disabled:opacity-40 lg:min-h-0 lg:text-[11px]"
                 style={{
                   background: "var(--bg-raised)",
                   border: "1px solid var(--border)",
@@ -730,7 +754,7 @@ export function ChatPanel() {
               </button>
             ))}
           </div>
-          <div className="flex items-end gap-2">
+          <div className="flex items-end gap-1.5 lg:gap-2">
             <label htmlFor="order-input" className="sr-only">
               Fire an order
             </label>
@@ -753,7 +777,7 @@ export function ChatPanel() {
                 publicKey ? "Order anything — “Quote 10 COOK → bCOOK”…" : "Connect Nightly, then order…"
               }
               disabled={busy}
-              className="max-h-[132px] flex-1 resize-none rounded-[var(--radius-md)] px-3 py-2.5 text-[13.5px] leading-relaxed outline-none transition-colors placeholder:text-[var(--text-tertiary)] disabled:opacity-50"
+              className="max-h-[132px] min-w-0 flex-1 resize-none rounded-[var(--radius-md)] px-3 py-2.5 text-[13.5px] leading-relaxed outline-none transition-colors placeholder:text-[var(--text-tertiary)] disabled:opacity-50"
               style={{
                 background: "var(--bg-inset)",
                 border: "1px solid var(--border)",
@@ -769,7 +793,7 @@ export function ChatPanel() {
             <button
               onClick={() => void onSend()}
               disabled={busy || !input.trim()}
-              className="shrink-0 rounded-[var(--radius-md)] px-4 py-2.5 text-[13.5px] font-semibold transition-opacity disabled:opacity-30"
+              className="flex min-h-[44px] shrink-0 items-center rounded-[var(--radius-md)] px-3 py-2.5 text-[13.5px] font-semibold transition-opacity disabled:opacity-30 lg:min-h-0 lg:px-4"
               style={{ background: "var(--copper)", color: "#1d1206" }}
             >
               Fire
@@ -784,7 +808,9 @@ export function ChatPanel() {
               ↓ Latest — new tickets below
             </button>
           ) : (
-            <p className="font-mono text-[10.5px]" style={{ color: "var(--text-tertiary)" }}>
+            // Static hint is desktop-only: on phones and tablets it's one more
+            // line pushing the feed up for zero actionable value.
+            <p className="hidden font-mono text-[10.5px] lg:block" style={{ color: "var(--text-tertiary)" }}>
               {publicKey
                 ? "quoted first · signed in Nightly · settled ~1s"
                 : "read-only until Nightly connects"}
@@ -809,15 +835,22 @@ function Message({
 }) {
   if (msg.role === "user") {
     return (
-      <div className="animate-ticket-in ml-auto max-w-[88%]">
+      <div className="animate-ticket-in ml-auto max-w-[92%] sm:max-w-[88%]">
         <div
-          className="mb-1 text-right font-mono text-[10px] uppercase tracking-[0.12em]"
+          className="mb-1 truncate text-right font-mono text-[10px] uppercase tracking-[0.12em]"
           style={{ color: "var(--text-tertiary)" }}
         >
-          No. {String(msg.ticketNo ?? 0).padStart(3, "0")} · {kindLabel(msg.text)} · {fmtClock(msg.ts)}
+          {/* Kind label is desktop-only: ticket number + clock is enough
+              context on a 320px line. */}
+          <span className="hidden min-[400px]:inline">
+            No. {String(msg.ticketNo ?? 0).padStart(3, "0")} · {kindLabel(msg.text)} · {fmtClock(msg.ts)}
+          </span>
+          <span className="min-[400px]:hidden">
+            No. {String(msg.ticketNo ?? 0).padStart(3, "0")} · {fmtClock(msg.ts)}
+          </span>
         </div>
         <div
-          className="rounded-[var(--radius-md)] px-3 py-2 text-[13.5px] leading-relaxed"
+          className="rounded-[var(--radius-md)] px-3 py-2 text-[13.5px] leading-relaxed break-words"
           style={{ background: "var(--bg-raised)", border: "1px solid var(--border)" }}
         >
           {msg.text}
@@ -829,7 +862,7 @@ function Message({
   if (msg.role === "system") {
     return (
       <div
-        className="animate-ticket-in rounded-[var(--radius-md)] px-3 py-2 font-mono text-[12px] leading-relaxed"
+        className="animate-ticket-in rounded-[var(--radius-md)] px-3 py-2 font-mono text-[12px] leading-relaxed break-words"
         style={{
           background: "var(--error-dim)",
           border: "1px solid #c46a5a44",
@@ -855,13 +888,13 @@ function Message({
   }
 
   return (
-    <div className="animate-ticket-in mr-auto flex max-w-[92%] gap-2.5">
+    <div className="animate-ticket-in mr-auto flex max-w-full gap-2.5 sm:max-w-[92%]">
       <div className="mt-0.5 shrink-0">
         <SousMark size={20} />
       </div>
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         {msg.text ? (
-          <p className="text-[13.5px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+          <p className="text-[13.5px] leading-relaxed break-words" style={{ color: "var(--text-secondary)" }}>
             {msg.text}
           </p>
         ) : null}
@@ -871,7 +904,7 @@ function Message({
             href={txUrl(msg.signature)}
             target="_blank"
             rel="noreferrer"
-            className="mt-1.5 inline-block font-mono text-[12px] tnum transition-opacity hover:opacity-70"
+            className="mt-1.5 inline-flex min-h-[32px] items-center break-all font-mono text-[12px] tnum transition-opacity hover:opacity-70"
             style={{ color: "var(--copper-bright)" }}
           >
             {shortAddr(msg.signature, 6)} ↗
@@ -901,10 +934,10 @@ function LedgerTable({ table }: { table: TableData }) {
       <dl className="px-3 pb-2.5">
         {table.rows.map((r, i) => (
           <div key={`${r.label}-${i}`} className="flex items-baseline justify-between gap-3 border-t border-[var(--border-subtle)] py-1.5 text-[12.5px] first:border-t-0">
-            <dt className="min-w-0 truncate" style={{ color: "var(--text-secondary)" }}>
+            <dt className="min-w-0 flex-1 truncate" style={{ color: "var(--text-secondary)" }} title={r.label}>
               {r.label}
             </dt>
-            <dd className="shrink-0 font-mono tnum" style={{ color: "var(--text-primary)" }}>
+            <dd className="max-w-[55%] shrink-0 truncate text-right font-mono tnum" style={{ color: "var(--text-primary)" }} title={r.value}>
               {isAddressLike(r.value) ? (
                 <a
                   href={addressUrl(r.value)}
@@ -937,18 +970,18 @@ function LedgerTable({ table }: { table: TableData }) {
 
 function Hero({ connected }: { connected: boolean }) {
   return (
-    <div className="animate-ticket-in flex flex-col items-center py-8 text-center sm:py-12">
-      <SousMark size={44} />
+    <div className="animate-ticket-in flex flex-col items-center px-2 py-6 text-center sm:py-12">
+      <SousMark size={40} />
       <p
-        className="mt-5 font-mono text-[10.5px] uppercase tracking-[0.18em]"
+        className="mt-4 font-mono text-[10.5px] uppercase tracking-[0.18em] sm:mt-5"
         style={{ color: "var(--text-tertiary)" }}
       >
         Conversational trading · Cookie Chain
       </p>
-      <h1 className="font-display mt-3 max-w-md text-[34px] font-semibold leading-[1.08] sm:text-[40px]">
+      <h1 className="font-display mt-3 max-w-md text-balance text-[clamp(1.75rem,8vw,2.5rem)] font-semibold leading-[1.08] sm:text-[40px]">
         The pass is open.
       </h1>
-      <p className="mt-3 max-w-md text-[14px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+      <p className="mt-3 max-w-md text-balance text-[14px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
         Fire swaps, sends, stakes, and standing orders in plain words. Sous quotes it,
         you sign in Nightly, the chain serves in about a second.
       </p>
@@ -959,8 +992,10 @@ function Hero({ connected }: { connected: boolean }) {
         </p>
       )}
 
+      {/* Chain facts are desktop-only: three stats cost ~50px on a phone
+          and repeat what the Market rail already shows live. */}
       <dl
-        className="mt-8 flex items-center gap-5 font-mono text-[11px] tnum"
+        className="mt-8 hidden max-w-full flex-wrap items-center justify-center gap-x-5 gap-y-3 font-mono text-[11px] tnum sm:flex"
         style={{ color: "var(--text-tertiary)" }}
       >
         <div className="flex flex-col gap-0.5">

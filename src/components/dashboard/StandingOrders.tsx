@@ -106,7 +106,7 @@ export function StandingOrders() {
             onClick={() => void orders.refetch()}
             aria-label="Refresh standing orders"
             title="Refresh standing orders"
-            className="font-mono text-[11px] transition-opacity hover:opacity-70 disabled:opacity-40"
+            className="flex min-h-[36px] min-w-[36px] items-center justify-center font-mono text-[13px] transition-opacity hover:opacity-70 disabled:opacity-40"
             style={{ color: "var(--text-tertiary)" }}
             disabled={orders.isFetching}
           >
@@ -125,19 +125,19 @@ export function StandingOrders() {
             No standing orders — “Limit sell 5 bCOOK → COOK at 2.0” writes one.
           </p>
         ) : (
-          <ul className="flex flex-col">
+          <ul className="flex min-w-0 flex-col">
             {list.map((o) => (
               <li
                 key={o.id}
-                className="flex items-center justify-between gap-3 border-t border-[var(--border-subtle)] py-1.5 text-[12.5px] first:border-t-0"
+                className="flex min-w-0 items-center justify-between gap-3 border-t border-[var(--border-subtle)] py-1.5 text-[12.5px] first:border-t-0"
               >
-                <span className="min-w-0 truncate font-mono" style={{ color: "var(--text-primary)" }} title={o.id}>
+                <span className="min-w-0 flex-1 truncate font-mono break-all" style={{ color: "var(--text-primary)" }} title={`${o.label} · ${o.id}`}>
                   {o.label}
                 </span>
                 <button
                   onClick={() => void onCancel(o.id)}
                   disabled={cancelling !== null}
-                  className="shrink-0 text-[12px] font-medium transition-opacity hover:opacity-70 disabled:opacity-40"
+                  className="flex min-h-[36px] shrink-0 items-center px-1 text-[12px] font-medium transition-opacity hover:opacity-70 disabled:opacity-40"
                   style={{ color: "var(--copper-bright)" }}
                 >
                   {cancelling === o.id ? "Scrapping…" : "Scrap"}

@@ -88,16 +88,95 @@ body {
   font-feature-settings: "ss01", "cv01";
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  overflow-x: clip;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
+/* Long addresses / hashes / amounts never force horizontal scroll. */
+p, dd, dt, span, a, li {
+  overflow-wrap: anywhere;
 }
 
 .font-display {
   font-family: var(--font-display);
   letter-spacing: -0.01em;
+  text-wrap: balance;
 }
 
 .tnum {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
+}
+
+/* ─── Responsive foundation ──────────────────────────────────
+   Mobile-first gutters, safe areas, touch floors, iOS fixes.
+   Discrete breakpoints only where structure changes; fluid
+   everywhere else. */
+
+:root {
+  --gutter: 1rem;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-t: env(safe-area-inset-top, 0px);
+}
+
+@media (min-width: 640px) {
+  :root {
+    --gutter: 1.5rem;
+  }
+}
+
+/* Safe-area helpers for fixed/docked chrome */
+.pb-safe {
+  padding-bottom: max(1rem, var(--safe-b));
+}
+.pt-safe {
+  padding-top: max(0px, var(--safe-t));
+}
+
+/* Prevent iOS auto-zoom on focus: inputs read at 16px on small screens. */
+@media (max-width: 767px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+  input::placeholder,
+  textarea::placeholder {
+    font-size: 13.5px;
+  }
+}
+
+/* Coarse pointers get a 44px touch floor on real controls. */
+@media (pointer: coarse) {
+  button,
+  a,
+  [role="tab"],
+  input[type="button"],
+  input[type="submit"] {
+    min-height: 40px;
+  }
+  button {
+    touch-action: manipulation;
+  }
+}
+
+/* Sonner: full-width bottom sheet on phones, corner toast on desktop */
+@media (max-width: 639px) {
+  [data-sonner-toaster] {
+    left: 12px !important;
+    right: 12px !important;
+    bottom: max(12px, env(safe-area-inset-bottom, 0px)) !important;
+    width: auto !important;
+  }
+  [data-sonner-toast] {
+    width: 100% !important;
+  }
 }
 
 /* ─── Focus — always visible ───────────────────────────────── */
@@ -195,12 +274,19 @@ body {
 
 .wallet-adapter-modal-wrapper {
   background: rgba(14, 12, 10, 0.8) !important;
+  padding: 16px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .wallet-adapter-modal-container {
   background: var(--bg-raised) !important;
   border: 1px solid var(--border-strong) !important;
   border-radius: var(--radius-lg) !important;
   box-shadow: none !important;
+  max-width: min(420px, calc(100vw - 32px)) !important;
+  max-height: min(88dvh, 640px);
+  overflow-y: auto !important;
+  margin: max(16px, env(safe-area-inset-top, 0px)) auto !important;
 }
 .wallet-adapter-modal-title {
   color: var(--text-primary) !important;

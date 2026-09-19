@@ -43,13 +43,17 @@ export function Header() {
   return (
     <header
       className="sticky top-0 z-20 shrink-0"
-      style={{ background: "var(--bg-base)", borderBottom: "1px solid var(--border)" }}
+      style={{
+        background: "var(--bg-base)",
+        borderBottom: "1px solid var(--border)",
+        paddingTop: "env(safe-area-inset-top, 0px)",
+      }}
     >
-      <div className="mx-auto flex h-[52px] w-full max-w-[1200px] items-center justify-between gap-3 px-4">
-        <div className="flex min-w-0 items-center gap-2.5">
+      <div className="mx-auto flex h-[52px] w-full max-w-[1200px] items-center justify-between gap-2 px-3 sm:gap-3 sm:px-4">
+        <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-2.5">
           <SousMark size={26} />
           <div className="flex min-w-0 flex-col leading-none">
-            <span className="font-display text-[17px] font-semibold">
+            <span className="font-display truncate text-[17px] font-semibold">
               Sous
             </span>
             <span
@@ -61,7 +65,7 @@ export function Header() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           <ChainPulse />
           <span
             aria-hidden

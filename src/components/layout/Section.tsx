@@ -11,15 +11,15 @@ export function Section({
   children: ReactNode;
 }) {
   return (
-    <section className="px-4 py-4">
-      <div className="mb-3 flex items-center justify-between">
+    <section className="px-3 py-4 sm:px-4">
+      <div className="mb-3 flex min-w-0 items-center justify-between gap-2">
         <h2
-          className="text-[10px] font-semibold uppercase tracking-[0.14em]"
+          className="min-w-0 truncate text-[10px] font-semibold uppercase tracking-[0.14em]"
           style={{ color: "var(--text-tertiary)" }}
         >
           {label}
         </h2>
-        {action}
+        {action && <div className="flex shrink-0 items-center">{action}</div>}
       </div>
       {children}
     </section>
