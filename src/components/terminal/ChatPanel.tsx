@@ -21,6 +21,7 @@ import {
   TxError,
 } from "@/lib/tx/signAndSend";
 import { cancelLimitOrder } from "@/lib/tx/cancelOrder";
+import { guardSummary, resolvedDestination } from "@/lib/tx/guard";
 import { parseIntent, EXAMPLE_ORDERS, type Intent } from "@/lib/intent";
 import { QuoteTicket } from "./QuoteTicket";
 import { SousMark } from "@/components/brand/SousMark";
@@ -28,22 +29,11 @@ import { SousLoader } from "@/components/brand/SousLoader";
 import {
   shortAddr,
   fmtClock,
-  pickKey,
   isAddressLike,
 } from "@/lib/utils/format";
 import { unwrapMcp, toRows, balanceRows } from "@/lib/mcp/shapes";
 import { txUrl, addressUrl } from "@/lib/chain/explorer";
 import { CHAIN_META, NATIVE_COOK_MINT } from "@/lib/chain/config";
-
-/* ─── Sign-guard comparisons: exact for mints, lenient for symbols ─── */
-
-function sameRef(a: string, b: string): boolean {
-  if (a === b) return true;
-  if (!isAddressLike(a) && !isAddressLike(b)) {
-    return a.toLowerCase() === b.toLowerCase();
-  }
-  return false;
-}
 
 /** The ticket number of the most recent user order. */
 function lastTicketNo(): number | undefined {
@@ -54,113 +44,6 @@ function lastTicketNo(): number | undefined {
     }
   }
   return undefined;
-}
-
-function numOf(v: unknown): number | null {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-}
-
-function amountsMatch(a: unknown, b: number): boolean {
-  const n = numOf(a);
-  if (n === null) return true; // key absent or unreadable — nothing to contradict
-  return Math.abs(n - b) <= 1e-9 * Math.max(1, b);
-}
-
-/** Refuse to sign when an itemized summary contradicts the order. */
-function summaryMatches(
-  summary: unknown,
-  intent: { amount: number; from: string; to: string },
-): { ok: boolean; detail?: string } {
-  if (!summary || typeof summary !== "object") return { ok: true };
-  const s = summary as Record<string, unknown>;
-  const sFrom = pickKey(s, ["from", "input", "inputMint", "inMint", "src", "source", "sell"]);
-  const sTo = pickKey(s, ["to", "output", "outputMint", "outMint", "dst", "dest", "buy"]);
-  const sAmt = pickKey(s, ["amount", "inAmount", "quantity", "value"]);
-  if (typeof sFrom === "string" && !sameRef(sFrom, intent.from)) {
-    return { ok: false, detail: `summary says ${sFrom}, order says ${intent.from}` };
-  }
-  if (typeof sTo === "string" && !sameRef(sTo, intent.to)) {
-    return { ok: false, detail: `summary says ${sTo}, order says ${intent.to}` };
-  }
-  if (sAmt !== undefined && !amountsMatch(sAmt, intent.amount)) {
-    return { ok: false, detail: `summary says ${sAmt}, order says ${intent.amount}` };
-  }
-  return { ok: true };
-}
-
-function transferMatches(
-  summary: unknown,
-  intent: { amount: number; token: string; to: string },
-): { ok: boolean; detail?: string } {
-  if (!summary || typeof summary !== "object") return { ok: true };
-  const s = summary as Record<string, unknown>;
-  const sAmt = pickKey(s, ["amount", "inAmount", "quantity", "value"]);
-  const sTok = pickKey(s, ["mint", "token", "symbol", "currency", "inputMint"]);
-  const sTo = pickKey(s, ["to", "dest", "destination", "recipient", "address", "owner"]);
-  if (sAmt !== undefined && !amountsMatch(sAmt, intent.amount)) {
-    return { ok: false, detail: `summary says ${sAmt}, order says ${intent.amount}` };
-  }
-  if (typeof sTok === "string" && !sameRef(sTok, intent.token)) {
-    return { ok: false, detail: `summary says ${sTok}, order says ${intent.token}` };
-  }
-  if (typeof sTo === "string") {
-    const a = sTo.trim().replace(/[.,;!?)]+$/, "");
-    const b = intent.to.trim();
-    if (!sameRef(a, b)) {
-      return { ok: false, detail: `summary pays ${a}, order pays ${b}` };
-    }
-  }
-  return { ok: true };
-}
-
-/** Guard every ticket kind before the wallet ever sees it. */
-function guardSummary(
-  summary: unknown,
-  q: QuoteData,
-): { ok: boolean; detail?: string } {
-  const pair = {
-    amount: q.amount,
-    from: q.expectFrom ?? q.from,
-    to: q.expectTo ?? q.to,
-  };
-  switch (q.orderKind) {
-    case "transfer":
-      return transferMatches(summary, { amount: q.amount, token: pair.from, to: q.to });
-    case "bridge": {
-      // Destinations are chain-side addresses — only amount + token are stable.
-      if (!summary || typeof summary !== "object") return { ok: true };
-      const s = summary as Record<string, unknown>;
-      const sAmt = pickKey(s, ["amount", "inAmount", "quantity", "value"]);
-      const sTok = pickKey(s, ["from", "token", "mint", "symbol", "input"]);
-      if (sAmt !== undefined && !amountsMatch(sAmt, q.amount)) {
-        return { ok: false, detail: `summary says ${sAmt}, order says ${q.amount}` };
-      }
-      if (typeof sTok === "string" && !sameRef(sTok, pair.from)) {
-        return { ok: false, detail: `summary says ${sTok}, order says ${pair.from}` };
-      }
-      return { ok: true };
-    }
-    case "limit": {
-      const base = summaryMatches(summary, pair);
-      if (!base.ok) return base;
-      if (summary && typeof summary === "object") {
-        const p = pickKey(summary as Record<string, unknown>, [
-          "price",
-          "limitPrice",
-          "triggerPrice",
-          "trigger",
-        ]);
-        const want = Number((q.fireArgs.price as number | undefined) ?? NaN);
-        if (p !== undefined && Number.isFinite(want) && !amountsMatch(p, want)) {
-          return { ok: false, detail: `summary price says ${p}, order says ${want}` };
-        }
-      }
-      return { ok: true };
-    }
-    default:
-      return summaryMatches(summary, pair);
-  }
 }
 
 function errText(e: unknown): string {
@@ -205,10 +88,13 @@ function kindLabel(text: string): string {
   }
 }
 
-function servedText(q: QuoteData): string {
+function servedText(q: QuoteData, resolvedTo?: string | null): string {
   switch (q.orderKind) {
-    case "transfer":
-      return `Sent — ${q.amount} ${q.from} → ${q.to}.`;
+    case "transfer": {
+      // When the order named a .cook name, show the address it actually paid.
+      const dest = resolvedTo && resolvedTo !== q.to ? `${q.to} (${shortAddr(resolvedTo, 6)})` : q.to;
+      return `Sent — ${q.amount} ${q.from} → ${dest}.`;
+    }
     case "limit":
       return `Standing order placed — ${q.amount} ${q.from} → ${q.to} ${q.detail ?? ""}.`;
     case "stake":
@@ -618,7 +504,7 @@ export function ChatPanel() {
     if (msgId) updateQuote(msgId, { state: "fired" });
     push({
       role: "assistant",
-      text: servedText(q),
+      text: servedText(q, resolvedDestination(payload.summary)),
       signature: sig,
     });
     toast.success(`Served · ${shortAddr(sig, 6)}`);
