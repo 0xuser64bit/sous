@@ -30,6 +30,7 @@ import {
   shortAddr,
   fmtClock,
   isAddressLike,
+  trimAmount,
 } from "@/lib/utils/format";
 import { unwrapMcp, toRows, balanceRows } from "@/lib/mcp/shapes";
 import { txUrl, addressUrl } from "@/lib/chain/explorer";
@@ -396,10 +397,11 @@ export function ChatPanel() {
       to: outMeta.symbol,
       expectFrom: inMeta.mint,
       expectTo: outMeta.mint,
-      outAmount: best.out,
+      outAmount: `${trimAmount(best.out)} ${outMeta.symbol}`,
       venue: best.venue ? `${best.aggregator} · ${best.venue}` : best.aggregator,
-      altQuote: alt ? `${alt.aggregator} ${alt.out}` : undefined,
+      altQuote: alt ? `${alt.aggregator} ${trimAmount(alt.out)}` : undefined,
       impact: best.impact,
+      warning: best.warnings?.join(" "),
       fireTool: "trade",
       fireArgs: {
         inputMint: inMeta.mint,
@@ -408,7 +410,7 @@ export function ChatPanel() {
         aggregator: best.aggregator,
       },
       note: alt
-        ? `Best of two venues — the other quoted ${alt.out}.`
+        ? `Best of two venues — the other quoted ${trimAmount(alt.out)}.`
         : "Single venue answered — quoted alone.",
     });
     setPhase("idle");

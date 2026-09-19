@@ -42,6 +42,8 @@ export type QuoteData = {
   impact?: string;
   state: QuoteState;
   note?: string;
+  /** Token-2022 transfer-hook caution shown prominently before signing. */
+  warning?: string;
 };
 
 export type TableData = {

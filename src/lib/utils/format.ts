@@ -34,6 +34,20 @@ export function fmtClock(ts: number): string {
   });
 }
 
+/**
+ * Trim a token amount string to at most `dp` decimals for display, truncating
+ * toward zero so we never overstate what the user receives. Keeps the exact
+ * value everywhere else — this is display-only.
+ */
+export function trimAmount(v: string | number | undefined | null, dp = 6): string {
+  if (v === undefined || v === null || v === "") return "—";
+  const n = typeof v === "string" ? Number(v) : v;
+  if (!Number.isFinite(n)) return typeof v === "string" ? v : "—";
+  const factor = 10 ** dp;
+  const truncated = Math.trunc(n * factor) / factor;
+  return truncated.toLocaleString("en-US", { maximumFractionDigits: dp });
+}
+
 /** Best-effort pick of the first present key (case-insensitive). */
 export function pickKey(
   data: Record<string, unknown>,

@@ -2,6 +2,7 @@
 
 import type { OrderKind, QuoteData } from "@/lib/store/usePilotStore";
 import { fmtClock } from "@/lib/utils/format";
+import { CHAIN_META } from "@/lib/chain/config";
 
 const KIND_WORD: Record<OrderKind, string> = {
   swap: "Tasting",
@@ -32,7 +33,7 @@ export function QuoteTicket({
   onFire: (msgId: string) => void;
   onDismiss: (msgId: string) => void;
 }) {
-  const { orderKind, amount, from, to, detailLabel, detail, altQuote, outAmount, venue, impact, state, note } = quote;
+  const { orderKind, amount, from, to, detailLabel, detail, altQuote, outAmount, venue, impact, state, note, warning } = quote;
   const dead = state === "fired" || state === "dismissed" || state === "failed";
 
   return (
@@ -58,16 +59,26 @@ export function QuoteTicket({
         </p>
       </div>
 
-      {/* Line items */}
+      {/* Line items — only the ones that mean something for this order kind. */}
       <dl className="space-y-1.5 px-4 py-3 text-[12.5px]">
         <Line label="You fire" value={`${amount} ${from}`} strong />
-        <Line label="You receive" value={outAmount ?? "—"} strong />
+        {outAmount && <Line label="You receive" value={outAmount} strong />}
         {detail && detailLabel && <Line label={detailLabel} value={detail} />}
-        <Line label="Venue" value={venue ?? "best of Cookiebox · Candy Shop"} />
+        {venue && <Line label="Venue" value={venue} />}
         {altQuote && <Line label="Also quoted" value={altQuote} />}
         {impact && <Line label="Price impact" value={impact} />}
-        <Line label="Est. fee" value="≈ 0.000005 COOK" />
+        <Line label="Est. fee" value={`≈ ${CHAIN_META.avgFeeCook} COOK`} />
       </dl>
+
+      {warning && (
+        <p
+          className="mx-4 mb-2 rounded-[var(--radius-sm)] px-2.5 py-1.5 text-[11px] leading-relaxed"
+          style={{ background: "var(--warning-dim)", color: "var(--copper-deep)" }}
+          role="note"
+        >
+          ⚠ {warning}
+        </p>
+      )}
 
       {note && (
         <p className="px-4 pb-2 font-mono text-[11px] leading-relaxed" style={{ color: "var(--ink-soft)" }}>

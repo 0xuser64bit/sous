@@ -19,8 +19,30 @@ export type QuoteView = {
   minOut?: string;
   venue?: string;
   impact?: string;
+  /** Token-2022 transfer-hook cautions (one per hooked mint), if any. */
+  warnings?: string[];
   raw: Record<string, unknown>;
 };
+
+/** Token-2022 transfer-hook warnings: issuer code runs on every transfer and
+ * can reject it. get_quote returns them only for hooked mints — surface so the
+ * user reads before signing. */
+function warningsOf(raw: Record<string, unknown>): string[] | undefined {
+  const w = pickKey(raw, ["warnings", "routeWarnings"]);
+  if (!Array.isArray(w) || !w.length) return undefined;
+  const lines = w
+    .map((item) => {
+      if (typeof item === "string") return item;
+      if (item && typeof item === "object") {
+        const o = item as Record<string, unknown>;
+        const detail = pickKey(o, ["detail", "message", "title", "reason"]);
+        return typeof detail === "string" ? detail : undefined;
+      }
+      return undefined;
+    })
+    .filter((s): s is string => typeof s === "string" && s.length > 0);
+  return lines.length ? lines : undefined;
+}
 
 function numOrNull(v: unknown): number | null {
   const n = Number(v);
@@ -105,6 +127,7 @@ function toView(aggregator: Aggregator, raw: unknown): QuoteView | null {
     minOut: min,
     venue: f.venue,
     impact: f.impact,
+    warnings: warningsOf(o),
     raw: o,
   };
 }

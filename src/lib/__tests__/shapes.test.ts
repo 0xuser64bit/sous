@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { shortAddr, fmtNum, pickKey } from "../utils/format";
+import { shortAddr, fmtNum, pickKey, trimAmount } from "../utils/format";
 import { unwrapMcp, toRows, str, mcpErrorMessage, balanceRows } from "../mcp/shapes";
 
 describe("format", () => {
@@ -14,6 +14,12 @@ describe("format", () => {
   it("picks keys case-insensitively", () => {
     expect(pickKey({ Slot: 12 }, ["slot"])).toBe(12);
     expect(pickKey({}, ["slot"])).toBeUndefined();
+  });
+  it("trims amounts for display without overstating", () => {
+    expect(trimAmount("7.506496794")).toBe("7.506496");
+    expect(trimAmount("9.982")).toBe("9.982");
+    expect(trimAmount(undefined)).toBe("—");
+    expect(trimAmount("not-a-number")).toBe("not-a-number");
   });
 });
 
