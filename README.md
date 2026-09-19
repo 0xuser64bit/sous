@@ -21,7 +21,7 @@ COOKIE_SIGNER=external npx -y cookie-mcp --http 8787
 pnpm dev
 ```
 
-Open http://localhost:3000 → Connect **Nightly** → ask `Quote 10 COOK -> bCOOK`.
+Open http://localhost:3000 (landing) → **Launch the pass** → `/app` → Connect **Nightly** → ask `Quote 10 COOK -> bCOOK`.
 
 Health checks: `pnpm chain:health` (RPC slot) and `GET /api/health`.
 
