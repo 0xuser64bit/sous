@@ -9,6 +9,7 @@ import {
   DEMO_START,
   DEMO_TEXT,
   PHASE_MS,
+  captionFor,
   demoReducer,
   expoFor,
 } from "@/lib/landing/demoScript";
@@ -74,6 +75,7 @@ export function DemoTheater() {
 
   // Reduced motion: rest on the finished frame, no timers, no replay.
   const frame = reduced ? DEMO_FINAL : state;
+  const activeCaption = captionFor(frame.phase);
   const expo = expoFor(frame.phase);
 
   const showBubble = frame.phase !== "typing";
@@ -82,13 +84,13 @@ export function DemoTheater() {
   const showReceipt = fired;
 
   return (
-    <div>
-      {/* Stage, full width */}
+    <div className="grid items-start gap-8 lg:grid-cols-12 lg:gap-10">
+      {/* Stage */}
       <div
         ref={boxRef}
         role="region"
         aria-label="Simulated demo: a swap order traveling from words to receipt. Read-only preview."
-        className="overflow-hidden rounded-[var(--radius-md)]"
+        className="overflow-hidden rounded-[var(--radius-md)] lg:col-span-7"
         style={{ background: "var(--bg-raised)", border: "1px solid var(--border)" }}
       >
         <div
@@ -270,14 +272,36 @@ export function DemoTheater() {
         </div>
       </div>
 
-      {/* Captions: the story, kept for assistive tech now that the
-          stage runs full width. The animated feed is aria-hidden. */}
-      <ol className="sr-only" aria-label="What the demo shows">
-        {DEMO_CAPTIONS.map((c) => (
-          <li key={c.title}>
-            {c.title}: {c.text}
-          </li>
-        ))}
+      {/* Captions: the story, readable by everyone */}
+      <ol className="flex flex-col lg:col-span-5" aria-label="What the demo shows">
+        {DEMO_CAPTIONS.map((c, i) => {
+          const active = i === activeCaption;
+          const past = i < activeCaption;
+          return (
+            <li key={c.title} className="border-t border-[var(--border-subtle)] py-4 first:border-t-0 first:pt-0 lg:first:pt-0">
+              <p className="flex items-baseline gap-3">
+                <span
+                  className="font-mono text-[12px] tnum"
+                  style={{ color: active ? "var(--copper-bright)" : "var(--text-tertiary)" }}
+                >
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <span
+                  className="text-[15px] font-semibold"
+                  style={{ color: active || past ? "var(--text-primary)" : "var(--text-tertiary)" }}
+                >
+                  {c.title}
+                </span>
+              </p>
+              <p
+                className="mt-1.5 pl-9 text-[14px] leading-[1.7]"
+                style={{ color: active ? "var(--text-secondary)" : "var(--text-tertiary)" }}
+              >
+                {c.text}
+              </p>
+            </li>
+          );
+        })}
       </ol>
     </div>
   );

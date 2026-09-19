@@ -69,19 +69,19 @@ export type DemoCaption = { title: string; text: string };
 export const DEMO_CAPTIONS: DemoCaption[] = [
   {
     title: "Order in words",
-    text: "Type it like you'd say it. The parser reads swaps, sends, stakes, limits, and bridges — locally, no network.",
+    text: "Type it like you'd say it.",
   },
   {
     title: "Quoted on paper",
-    text: "Two aggregators quote and the survivor wins. Venue, impact, and fee land on the ticket before anything is signed.",
+    text: "Venue, impact, fee — before signing.",
   },
   {
     title: "Signed in Nightly",
-    text: "One approval. The guard checks the decoded summary first — mints, not symbols — and refuses on mismatch.",
+    text: "One approval. Guard checks first.",
   },
   {
     title: "Served with receipt",
-    text: "About a second, a fraction of a cent, and a Cookiescan link. This preview is canned; the pass is live in the app.",
+    text: "Seconds, fractions of a cent, receipt. Canned preview — pass is live.",
   },
 ];
 
