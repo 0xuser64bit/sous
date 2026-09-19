@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { shortAddr, fmtNum, pickKey } from "../utils/format";
-import { unwrapMcp, toRows, str } from "../mcp/shapes";
+import { unwrapMcp, toRows, str, mcpErrorMessage } from "../mcp/shapes";
 
 describe("format", () => {
   it("shortens addresses", () => {
@@ -48,5 +48,45 @@ describe("toRows", () => {
   it("str never throws on odd values", () => {
     expect(str(NaN)).toBe("—");
     expect(str(true)).toBe("yes");
+  });
+});
+
+describe("mcpErrorMessage", () => {
+  it("returns null for normal results", () => {
+    expect(
+      mcpErrorMessage({ result: { content: [{ text: '{"ok":true}' }] } }),
+    ).toBeNull();
+    expect(mcpErrorMessage({ result: { slot: 9 } })).toBeNull();
+    expect(mcpErrorMessage("ok")).toBeNull();
+  });
+  it("surfaces tool errors carrying JSON {error,hint}", () => {
+    // Captured live: transfer with an unfunded wallet.
+    const raw = {
+      jsonrpc: "2.0",
+      id: 1,
+      result: {
+        content: [
+          { type: "text", text: '{"error":"transfer simulation failed","hint":"check the recipient"}' },
+        ],
+        isError: true,
+      },
+    };
+    expect(mcpErrorMessage(raw)).toBe("transfer simulation failed — check the recipient");
+  });
+  it("surfaces tool errors carrying a plain string", () => {
+    const raw = {
+      result: { content: [{ text: "MCP error -32602: Input validation error" }], isError: true },
+    };
+    expect(mcpErrorMessage(raw)).toBe("MCP error -32602: Input validation error");
+  });
+  it("surfaces JSON-RPC protocol errors", () => {
+    expect(mcpErrorMessage({ jsonrpc: "2.0", id: 1, error: { code: -32600, message: "bad" } })).toBe(
+      "bad",
+    );
+  });
+  it("does not flag needs_signature as an error", () => {
+    expect(
+      mcpErrorMessage({ result: { content: [{ text: '{"status":"needs_signature"}' }] } }),
+    ).toBeNull();
   });
 });

@@ -43,6 +43,47 @@ export function unwrapMcp(v: unknown): unknown {
   return cur;
 }
 
+/**
+ * Detect a tool- or protocol-level error in a raw JSON-RPC MCP response.
+ * cookie-mcp returns tool failures as HTTP 200 with
+ * `{ result: { content:[...], isError:true } }` — without this, a refused
+ * write (failed simulation, bad input) would sail past `isNeedsSignature`
+ * and be reported to the user as "Served". Returns a human message, or
+ * null when the response is a normal result.
+ */
+export function mcpErrorMessage(raw: unknown): string | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const o = raw as Record<string, unknown>;
+  const rpcErr = o.error;
+  if (rpcErr && typeof rpcErr === "object") {
+    const m = (rpcErr as Record<string, unknown>).message;
+    if (typeof m === "string") return m;
+  }
+  if (typeof rpcErr === "string") return rpcErr;
+  const result = o.result;
+  if (
+    result &&
+    typeof result === "object" &&
+    (result as Record<string, unknown>).isError === true
+  ) {
+    return errorTextOf(unwrapMcp(raw));
+  }
+  return null;
+}
+
+function errorTextOf(payload: unknown): string {
+  if (typeof payload === "string") return payload;
+  if (payload && typeof payload === "object") {
+    const p = payload as Record<string, unknown>;
+    const err = p.error ?? p.message;
+    const hint = p.hint;
+    const base =
+      typeof err === "string" ? err : JSON.stringify(err ?? payload).slice(0, 200);
+    return typeof hint === "string" ? `${base} — ${hint}` : base;
+  }
+  return "Tool call failed.";
+}
+
 /** Short human rendering of a scalar-ish value. */
 export function str(v: unknown): string {
   if (v === null || v === undefined) return "—";

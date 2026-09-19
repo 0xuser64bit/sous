@@ -4,7 +4,7 @@
  * with x-cookie-wallet header, and gets back either data or
  * { status: 'needs_signature', transactionBase64, ... }.
  */
-import { unwrapMcp } from "./shapes";
+import { unwrapMcp, mcpErrorMessage } from "./shapes";
 import { fetchWithTimeout } from "@/lib/utils/fetch";
 
 export type McpTool =
@@ -71,6 +71,10 @@ export async function callMcp<T = unknown>(opts: {
   // Unwrap the JSON-RPC/content envelope here so every caller — and in
   // particular every isNeedsSignature check — sees the real payload.
   const json = await res.json();
+  // A tool-level failure (isError:true) arrives as HTTP 200. Surface it as
+  // a thrown error so a refused money move never reads as success.
+  const errMsg = mcpErrorMessage(json);
+  if (errMsg) throw new Error(`MCP ${opts.tool}: ${errMsg}`);
   return unwrapMcp(json) as T | NeedsSignature;
 }
 
