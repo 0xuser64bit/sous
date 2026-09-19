@@ -6,7 +6,7 @@ import {
   WalletProvider,
 } from "@solana/wallet-adapter-react";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
-import { NightlyWalletAdapter } from "@solana/wallet-adapter-wallets";
+import { NightlyWalletAdapter, PhantomWalletAdapter, SolflareWalletAdapter } from "@solana/wallet-adapter-wallets";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { COOKIE_RPC_URL } from "@/lib/chain/config";
 
@@ -29,7 +29,10 @@ const queryClient = new QueryClient({
  * the default choice, while keeping other adapters as fallback.
  */
 export function WalletProviders({ children }: { children: ReactNode }) {
-  const wallets = useMemo(() => [new NightlyWalletAdapter()], []);
+  const wallets = useMemo(
+    () => [new NightlyWalletAdapter(), new PhantomWalletAdapter(), new SolflareWalletAdapter()],
+    [],
+  );
 
   return (
     <ConnectionProvider endpoint={COOKIE_RPC_URL}>
