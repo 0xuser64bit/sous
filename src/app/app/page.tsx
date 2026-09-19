@@ -26,7 +26,7 @@ function rpcHost(): string {
 
 function Footer() {
   return (
-    <footer style={{ borderTop: "1px solid var(--border-subtle)" }}>
+    <footer className="shrink-0" style={{ borderTop: "1px solid var(--border-subtle)" }}>
       <div className="mx-auto flex w-full max-w-[1200px] flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 font-mono text-[10.5px]" style={{ color: "var(--text-tertiary)" }}>
         <span>
           rpc <span style={{ color: "var(--text-secondary)" }}>{rpcHost()}</span>
@@ -50,7 +50,10 @@ export default function Home() {
   const [tab, setTab] = useState<Tab>("pass");
 
   return (
-    <div className="flex min-h-screen flex-col">
+    // Viewport-locked: the pass fills the screen exactly. The feed and the
+    // rail scroll internally, the dock never leaves — connecting a wallet
+    // (or posting tickets) grows scrollable regions, never the page.
+    <div className="flex h-screen flex-col overflow-hidden supports-[height:100dvh]:h-dvh">
       <Header />
 
       {/* Mobile tab rail — the sidebar becomes tabs under lg */}
@@ -84,11 +87,11 @@ export default function Home() {
         </div>
       </nav>
 
-      <main className="mx-auto grid w-full max-w-[1200px] flex-1 lg:grid-cols-[300px_minmax(0,1fr)]">
-        {/* Context rail */}
+      <main className="mx-auto grid w-full max-w-[1200px] min-h-0 flex-1 lg:grid-cols-[300px_minmax(0,1fr)]">
+        {/* Context rail — self-scrolling */}
         <aside
           aria-label="Pantry and market"
-          className={`${tab === "pass" ? "hidden" : "block"} min-w-0 lg:block`}
+          className={`${tab === "pass" ? "hidden" : "block"} min-h-0 min-w-0 overflow-y-auto lg:block`}
           style={{ borderRight: "1px solid var(--border-subtle)" }}
         >
           <div
@@ -110,10 +113,10 @@ export default function Home() {
           </div>
         </aside>
 
-        {/* The pass — the product */}
+        {/* The pass — the product. min-h-0 keeps the feed, not the page, scrolling. */}
         <div
           id="panel-pass"
-          className={`${tab !== "pass" ? "hidden" : "flex"} min-w-0 flex-col lg:flex`}
+          className={`${tab !== "pass" ? "hidden" : "flex"} min-h-0 min-w-0 flex-col lg:flex`}
           role="tabpanel"
           aria-labelledby="tab-pass"
         >
