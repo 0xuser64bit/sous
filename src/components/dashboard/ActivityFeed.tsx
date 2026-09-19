@@ -22,8 +22,10 @@ function numSlot(s: string | null): number | null {
  * empty and fills while you watch.
  */
 function SlotSparkline({ slot }: { slot: number | null }) {
-  // Append-only history, adjusted during render (the documented
-  // derived-state pattern) so no effect-driven cascading renders.
+  // Append-only history, adjusted during render. This is React's endorsed
+  // derived-state-from-props pattern (conditional setState in render, never
+  // in an effect): the guard guarantees no render loop, and the line can
+  // never wedge on a slow poll.
   const [prev, setPrev] = useState<number | null>(null);
   const [hist, setHist] = useState<number[]>([]);
   if (slot !== prev) {

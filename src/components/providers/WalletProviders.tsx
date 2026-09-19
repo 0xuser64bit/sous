@@ -12,7 +12,17 @@ import { COOKIE_RPC_URL } from "@/lib/chain/config";
 
 import "@solana/wallet-adapter-react-ui/styles.css";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // The sidecar is a local process that can go down: fail fast, and
+      // never storm it with refires on every window focus. Polling queries
+      // carry their own refetchInterval; passive reads refetch on demand.
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 /**
  * Nightly is REQUIRED by the bounty. We list Nightly first so it is

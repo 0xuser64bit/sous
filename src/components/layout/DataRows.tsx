@@ -45,7 +45,7 @@ export function RowsSkeleton({ lines = 3 }: { lines?: number }) {
       {Array.from({ length: lines }).map((_, i) => (
         <div
           key={i}
-          className="h-3 rounded-[2px] animate-ticket-in"
+          className="h-3 rounded-[2px] animate-live"
           style={{ background: "var(--border-subtle)", width: widths[i % widths.length] }}
         />
       ))}

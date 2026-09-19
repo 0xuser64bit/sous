@@ -258,13 +258,45 @@ export function ChatPanel() {
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const areaRef = useRef<HTMLTextAreaElement>(null);
+  // Reader protection: only yank the feed to the bottom when the user is
+  // already there. Otherwise raise the Latest flag and let them finish
+  // reading the ticket in front of them.
+  const nearBottomRef = useRef(true);
+  const msgCountRef = useRef(messages.length);
+  const [showLatest, setShowLatest] = useState(false);
 
   const wallet = publicKey?.toBase58();
 
   useEffect(() => {
-    const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    const grew = messages.length > msgCountRef.current;
+    msgCountRef.current = messages.length;
+    if (nearBottomRef.current) {
+      const el = scrollRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+      setShowLatest(false);
+    } else if (grew) {
+      setShowLatest(true);
+    }
   }, [messages, busy]);
+
+  function scrollToLatest() {
+    const el = scrollRef.current;
+    if (!el) return;
+    const reduce =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    el.scrollTo({ top: el.scrollHeight, behavior: reduce ? "auto" : "smooth" });
+    nearBottomRef.current = true;
+    setShowLatest(false);
+  }
+
+  function onFeedScroll() {
+    const el = scrollRef.current;
+    if (!el) return;
+    const near = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+    nearBottomRef.current = near;
+    if (near) setShowLatest(false);
+  }
 
   function autosize() {
     const el = areaRef.current;
@@ -753,7 +785,7 @@ export function ChatPanel() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* Feed */}
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-5" aria-live="polite">
+      <div ref={scrollRef} onScroll={onFeedScroll} className="min-h-0 flex-1 overflow-y-auto px-4 py-5" aria-live="polite">
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
           {showHero ? (
             <Hero
@@ -853,11 +885,21 @@ export function ChatPanel() {
               Fire
             </button>
           </div>
-          <p className="font-mono text-[10.5px]" style={{ color: "var(--text-tertiary)" }}>
-            {publicKey
-              ? "quoted first · signed in Nightly · settled ~1s"
-              : "read-only until Nightly connects"}
-          </p>
+          {showLatest ? (
+            <button
+              onClick={scrollToLatest}
+              className="self-start font-mono text-[10.5px] transition-opacity hover:opacity-70"
+              style={{ color: "var(--copper-bright)" }}
+            >
+              ↓ Latest — new tickets below
+            </button>
+          ) : (
+            <p className="font-mono text-[10.5px]" style={{ color: "var(--text-tertiary)" }}>
+              {publicKey
+                ? "quoted first · signed in Nightly · settled ~1s"
+                : "read-only until Nightly connects"}
+            </p>
+          )}
         </div>
       </div>
     </div>

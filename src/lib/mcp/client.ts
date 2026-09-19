@@ -5,6 +5,7 @@
  * { status: 'needs_signature', transactionBase64, ... }.
  */
 import { unwrapMcp } from "./shapes";
+import { fetchWithTimeout } from "@/lib/utils/fetch";
 
 export type McpTool =
   | "chain_health"
@@ -48,15 +49,21 @@ export async function callMcp<T = unknown>(opts: {
   tool: McpTool;
   args?: Record<string, unknown>;
   wallet?: string;
+  /** Override the 30s sidecar timeout for slow builders. */
+  timeoutMs?: number;
 }): Promise<T | NeedsSignature> {
-  const res = await fetch("/api/mcp", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      ...(opts.wallet ? { "x-cookie-wallet": opts.wallet } : {}),
+  const res = await fetchWithTimeout(
+    "/api/mcp",
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...(opts.wallet ? { "x-cookie-wallet": opts.wallet } : {}),
+      },
+      body: JSON.stringify({ tool: opts.tool, args: opts.args ?? {} }),
     },
-    body: JSON.stringify({ tool: opts.tool, args: opts.args ?? {} }),
-  });
+    opts.timeoutMs ?? 30_000,
+  );
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`MCP ${opts.tool} failed (${res.status}): ${text}`);

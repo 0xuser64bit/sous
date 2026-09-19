@@ -65,8 +65,10 @@ export default function Home() {
             return (
               <button
                 key={t.id}
+                id={`tab-${t.id}`}
                 role="tab"
                 aria-selected={active}
+                aria-controls={`panel-${t.id}`}
                 onClick={() => setTab(t.id)}
                 className="flex-1 rounded-[var(--radius-md)] px-3 py-1.5 text-[12.5px] font-medium transition-colors"
                 style={{
@@ -88,12 +90,19 @@ export default function Home() {
           aria-label="Pantry and market"
           className={`${tab === "pass" ? "hidden" : "block"} min-w-0 lg:block`}
           style={{ borderRight: "1px solid var(--border-subtle)" }}
-          role="tabpanel"
         >
-          <div className={`${tab === "market" ? "hidden" : "block"} lg:block`}>
+          <div
+            id="panel-pantry"
+            role="tabpanel"
+            aria-labelledby="tab-pantry"
+            className={`${tab === "market" ? "hidden" : "block"} lg:block`}
+          >
             <PortfolioOverview />
           </div>
           <div
+            id="panel-market"
+            role="tabpanel"
+            aria-labelledby="tab-market"
             className={`${tab === "pantry" ? "hidden" : "block"} lg:block`}
             style={{ borderTop: "1px solid var(--border-subtle)" }}
           >
@@ -103,8 +112,10 @@ export default function Home() {
 
         {/* The pass — the product */}
         <div
+          id="panel-pass"
           className={`${tab !== "pass" ? "hidden" : "flex"} min-w-0 flex-col lg:flex`}
           role="tabpanel"
+          aria-labelledby="tab-pass"
         >
           <ChatPanel />
           <TxPass />

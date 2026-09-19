@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Fraunces } from "next/font/google";
 import "./globals.css";
 import { WalletProviders } from "@/components/providers/WalletProviders";
@@ -25,6 +25,23 @@ export const metadata: Metadata = {
   description:
     "Fire swaps, stake, and limit orders on Cookie Chain in plain words. Quoted, signed in Nightly, served in ~1 second.",
   icons: { icon: "/brand/sous-logo.svg" },
+  openGraph: {
+    title: "Sous — Your sous-chef for Cookie Chain",
+    description:
+      "Fire swaps, stake, and limit orders on Cookie Chain in plain words. Quoted, signed in Nightly, served in ~1 second.",
+    siteName: "Sous",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "Sous — Your sous-chef for Cookie Chain",
+    description:
+      "Fire swaps, stake, and limit orders on Cookie Chain in plain words. Quoted, signed in Nightly, served in ~1 second.",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#141210",
 };
 
 export default function RootLayout({

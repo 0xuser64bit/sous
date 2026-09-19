@@ -1,6 +1,7 @@
 import type { NeedsSignature } from "@/lib/mcp/client";
 import { VersionedTransaction, Transaction } from "@solana/web3.js";
 import { usePilotStore } from "@/lib/store/usePilotStore";
+import { fetchWithTimeout } from "@/lib/utils/fetch";
 
 /** Typed failure so the UI can tell "declined" apart from "broken". */
 export class TxError extends Error {
@@ -97,18 +98,28 @@ export async function signAndSubmitNeedsSignature(
   store.setPhase("confirming");
   let res: Response;
   try {
-    res = await fetch("/api/tx/submit", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        signedTx: bytesToB64(serialized),
-        submit: payload.submit,
-        blockhash: payload.blockhash,
-        lastValidBlockHeight: payload.lastValidBlockHeight,
-        what: payload.what,
-      }),
-    });
-  } catch {
+    // Generous timeout: the relay sends AND confirms on-chain, which can
+    // take a while under congestion. Abort still surfaces as TxError below.
+    res = await fetchWithTimeout(
+      "/api/tx/submit",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          signedTx: bytesToB64(serialized),
+          submit: payload.submit,
+          blockhash: payload.blockhash,
+          lastValidBlockHeight: payload.lastValidBlockHeight,
+          what: payload.what,
+        }),
+      },
+      60_000,
+    );
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "";
+    if (/timeout|abort/i.test(msg)) {
+      throw new TxError("failed", `Submit timed out — check the signature on Cookiescan before re-firing. (${msg})`);
+    }
     throw new TxError("failed", "Submit relay unreachable — check your connection and retry.");
   }
 
