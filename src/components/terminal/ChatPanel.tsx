@@ -788,11 +788,7 @@ export function ChatPanel() {
       <div ref={scrollRef} onScroll={onFeedScroll} className="min-h-0 flex-1 overflow-y-auto px-4 py-5" aria-live="polite">
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
           {showHero ? (
-            <Hero
-              onOrder={(o) => void onSend(o)}
-              disabled={busy}
-              connected={Boolean(publicKey)}
-            />
+            <Hero connected={Boolean(publicKey)} />
           ) : (
             messages.map((m) => (
               <Message
@@ -811,35 +807,34 @@ export function ChatPanel() {
         </div>
       </div>
 
-      {/* Dock */}
+      {/* Dock — pinned. Suggestions ride above the composer, AI-terminal style. */}
       <div className="shrink-0 px-4 pb-4 pt-2" style={{ borderTop: "1px solid var(--border-subtle)" }}>
         <div className="mx-auto flex max-w-2xl flex-col gap-2">
-          {!showHero && (
-            <div className="flex flex-wrap gap-1.5" aria-label="Suggestions">
-              {EXAMPLE_ORDERS.map((o) => (
-                <button
-                  key={o}
-                  onClick={() => void onSend(o)}
-                  disabled={busy}
-                  className="rounded-full px-2.5 py-1 font-mono text-[11px] transition-colors disabled:opacity-40"
-                  style={{
-                    border: "1px solid var(--border)",
-                    color: "var(--text-secondary)",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = "var(--border-strong)";
-                    e.currentTarget.style.color = "var(--text-primary)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = "var(--border)";
-                    e.currentTarget.style.color = "var(--text-secondary)";
-                  }}
-                >
-                  {o}
-                </button>
-              ))}
-            </div>
-          )}
+          <div className="flex flex-wrap gap-1.5" aria-label="Suggestions">
+            {EXAMPLE_ORDERS.map((o) => (
+              <button
+                key={o}
+                onClick={() => void onSend(o)}
+                disabled={busy}
+                className="rounded-full px-2.5 py-1 font-mono text-[11px] transition-colors disabled:opacity-40"
+                style={{
+                  background: "var(--bg-raised)",
+                  border: "1px solid var(--border)",
+                  color: "var(--text-secondary)",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "var(--copper-line)";
+                  e.currentTarget.style.color = "var(--text-primary)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "var(--border)";
+                  e.currentTarget.style.color = "var(--text-secondary)";
+                }}
+              >
+                {o}
+              </button>
+            ))}
+          </div>
           <div className="flex items-end gap-2">
             <label htmlFor="order-input" className="sr-only">
               Fire an order
@@ -1042,17 +1037,10 @@ function LedgerTable({ table }: { table: TableData }) {
   );
 }
 
-/* ─── Empty pass — the landing page inside the product ─────── */
+/* ─── Empty pass — headline and proof, nothing to tap ──────────
+   Example orders live as bubbles above the composer, not here. */
 
-function Hero({
-  onOrder,
-  disabled,
-  connected,
-}: {
-  onOrder: (o: string) => void;
-  disabled: boolean;
-  connected: boolean;
-}) {
+function Hero({ connected }: { connected: boolean }) {
   return (
     <div className="animate-ticket-in flex flex-col items-center py-8 text-center sm:py-12">
       <SousMark size={44} />
@@ -1069,32 +1057,6 @@ function Hero({
         Fire swaps, sends, stakes, and standing orders in plain words. Sous quotes it,
         you sign in Nightly, the chain serves in about a second.
       </p>
-
-      <div className="mt-6 flex w-full max-w-md flex-col gap-2" aria-label="Example orders">
-        {EXAMPLE_ORDERS.map((o, i) => (
-          <button
-            key={o}
-            onClick={() => onOrder(o)}
-            disabled={disabled}
-            className="group flex items-center gap-3 rounded-[var(--radius-md)] px-3.5 py-2.5 text-left transition-colors disabled:opacity-40"
-            style={{ background: "var(--bg-raised)", border: "1px solid var(--border)" }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = "var(--copper-line)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = "var(--border)";
-            }}
-          >
-            <span className="font-mono text-[11px] tnum" style={{ color: "var(--copper-bright)" }}>
-              {String(i + 1).padStart(2, "0")}
-            </span>
-            <span className="flex-1 text-[13.5px]" style={{ color: "var(--text-primary)" }}>
-              “{o}”
-            </span>
-            <span aria-hidden style={{ color: "var(--text-tertiary)" }}>→</span>
-          </button>
-        ))}
-      </div>
 
       {!connected && (
         <p className="mt-4 font-mono text-[11.5px]" style={{ color: "var(--text-tertiary)" }}>
