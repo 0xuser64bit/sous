@@ -13,7 +13,7 @@ in kitchen voice (Preheating / Tasting / Plating / Yes, Chef!).
 ## Quickstart (pnpm is the standard)
 
 ```bash
-cp .env.example .env.local
+cp .env.example .env
 pnpm install
 # terminal 1: MCP in external-signer mode (no keys in app process)
 COOKIE_SIGNER=external npx -y cookie-mcp --http 8787

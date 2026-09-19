@@ -14,6 +14,7 @@
 - [x] Intent parser (tiny, local): swap / transfer / stake / unstake / limit / orders / cancel / bridge / resolve / search (+ 23 unit tests)
 - [x] Always: resolve mints via search_tokens -> quote BOTH aggregators (cookiebox + cookiescan, survivor wins) -> paper ticket with venue + also-quoted line -> `trade` with winning aggregator -> needs_signature -> Nightly sign -> confirm -> Cookiescan link
 - [x] Decoded summary guard per kind (mint-aware: symbols lie, mints don't; incl. limit price, bridge amount+token) before sign; refuse on mismatch
+- [x] Ticket hardening (verified live): truncated display amounts (never round up what you receive), Token-2022 transfer-hook warnings surfaced pre-sign, honest owner/account labels on `.cook` resolves
 
 ## 03 DCA / limit-stop bot ✅ (partial — keeper fills are sidecar-side)
 - [x] UI: place_limit_order (limit + price), list via get_limit_orders, cancel via shared cancelLimitOrder helper (chat + pantry agree)
