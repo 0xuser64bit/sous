@@ -31,6 +31,7 @@ import {
   fmtClock,
   isAddressLike,
   trimAmount,
+  pickKey,
 } from "@/lib/utils/format";
 import { unwrapMcp, toRows, balanceRows } from "@/lib/mcp/shapes";
 import { txUrl, addressUrl } from "@/lib/chain/explorer";
@@ -626,13 +627,19 @@ export function ChatPanel() {
       const addr = findAddress(payload);
       if (addr) {
         const { rows } = toRows(payload, 4);
+        // Unregistered names have an account but no owner — label honestly.
+        const rec = (payload && typeof payload === "object" ? payload : {}) as Record<string, unknown>;
+        const ownerRaw = pickKey(rec, ["owner"]);
+        const ownerAddr =
+          typeof ownerRaw === "string" && isAddressLike(ownerRaw.trim()) ? ownerRaw.trim() : null;
+        const shown = ownerAddr ?? addr;
         push({
           role: "assistant",
           text: "",
           table: {
             title: name,
-            subtitle: shortAddr(addr, 6),
-            rows: [{ label: "owner", value: addr }, ...rows.filter((r) => r.value !== addr).slice(0, 3)],
+            subtitle: shortAddr(shown, 6),
+            rows: [{ label: ownerAddr ? "owner" : "account", value: shown }, ...rows.filter((r) => r.value !== shown).slice(0, 3)],
           },
         });
       } else {
