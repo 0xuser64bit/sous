@@ -7,8 +7,14 @@
 export const COOKIE_RPC_URL =
   process.env.NEXT_PUBLIC_COOKIE_RPC_URL ?? "https://rpc.cookiescan.io";
 
+/**
+ * Websocket endpoint. Defaults to the RPC host with a wss:// scheme
+ * (the conventional Solana layout) rather than the explorer domain —
+ * `wss://cookiescan.io` serves the explorer HTML, not a JSON-RPC socket.
+ */
 export const COOKIE_WSS_URL =
-  process.env.NEXT_PUBLIC_COOKIE_WSS_URL ?? "wss://cookiescan.io";
+  process.env.NEXT_PUBLIC_COOKIE_WSS_URL ??
+  COOKIE_RPC_URL.replace(/^http/, "ws");
 
 export const COOKIESCAN_BASE =
   process.env.NEXT_PUBLIC_COOKIESCAN_BASE ?? "https://cookiescan.io";

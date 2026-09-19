@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { VersionedTransaction, Transaction } from "@solana/web3.js";
+import { VersionedTransaction, Transaction, type Connection } from "@solana/web3.js";
 import { getConnection } from "@/lib/chain/connection";
 import { unwrapMcp } from "@/lib/mcp/shapes";
 import { pickKey } from "@/lib/utils/format";
@@ -119,9 +119,42 @@ async function submitViaSidecar(args: {
   }
 }
 
+/**
+ * Confirm by polling getSignatureStatuses over HTTP. cookie-mcp's own
+ * submit path confirms server-side; this fallback deliberately avoids
+ * `confirmTransaction`, which opens a websocket subscription — the WS
+ * endpoint is not guaranteed, and a dead socket would hang the request.
+ * Cookie Chain finalises in ~1s, so a 1s poll clears almost immediately.
+ */
+async function confirmByPolling(
+  conn: Connection,
+  sig: string,
+  lastValidBlockHeight?: number,
+): Promise<void> {
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    const { value } = await conn.getSignatureStatuses([sig]);
+    const st = value[0];
+    if (st) {
+      if (st.err) {
+        throw new Error(`Transaction failed on-chain: ${JSON.stringify(st.err).slice(0, 200)}`);
+      }
+      if (st.confirmationStatus === "confirmed" || st.confirmationStatus === "finalized") return;
+    } else if (typeof lastValidBlockHeight === "number") {
+      // No status yet — if the chain has passed the quote's block window the
+      // transaction can never land: report expiry rather than waiting it out.
+      const height = await conn.getBlockHeight("confirmed");
+      if (height > lastValidBlockHeight) {
+        throw new Error("blockhash expired before confirmation");
+      }
+    }
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  throw new Error("confirmation timed out");
+}
+
 async function submitDirect(
   bytes: Buffer,
-  blockhash?: string,
   lastValidBlockHeight?: number,
 ): Promise<string> {
   const conn = getConnection();
@@ -130,11 +163,7 @@ async function submitDirect(
     preflightCommitment: "confirmed",
     maxRetries: 2,
   });
-  if (blockhash && typeof lastValidBlockHeight === "number") {
-    await conn.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
-  } else {
-    await conn.confirmTransaction(sig, "confirmed");
-  }
+  await confirmByPolling(conn, sig, lastValidBlockHeight);
   return sig;
 }
 
@@ -204,7 +233,7 @@ export async function POST(req: NextRequest) {
     if ("transportError" in via) {
       // 2) Sidecar unreachable — direct RPC fallback (same safety checks).
       try {
-        const sig = await submitDirect(bytes, blockhash, lastValidBlockHeight);
+        const sig = await submitDirect(bytes, lastValidBlockHeight);
         return NextResponse.json({ signature: sig, via: "cookie-rpc-direct" });
       } catch (e) {
         const msg = e instanceof Error ? e.message : "submit failed";
