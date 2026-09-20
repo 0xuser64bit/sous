@@ -67,7 +67,13 @@ See `docs/BOUNTY.md` — required features checklist + optional integrations + d
 
 ## Deploy
 
-Vercel / Railway / Fly. Set env vars from `.env.example`. App is read-only until MCP URL is set; wallet signing is client-side via Nightly.
+The app is only as live as its sidecar: every read, quote, and fill goes
+through cookie-mcp in external-signer mode. Host the web app and the sidecar
+together (Railway / Fly with two processes, `MCP_HTTP_URL` pointing at the
+sidecar + `MCP_AUTH_TOKEN` set on both ends). Vercel alone cannot run the
+sidecar — point `MCP_HTTP_URL` at a hosted sidecar or the app degrades to
+honest per-action errors explaining the sidecar is down. Set env vars from
+`.env.example`. Wallet signing stays client-side via Nightly.
 
 ## Submission (TODO)
 
