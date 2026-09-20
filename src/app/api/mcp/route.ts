@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  clientIp,
+  createRateLimiter,
+  upstreamAuthHeaders,
+} from "@/lib/server/guard";
 
 /**
  * POST /api/mcp { tool, args }
@@ -37,7 +42,21 @@ const ALLOW = new Set([
 
 const BASE58 = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
+/** Best-effort abuse throttle for an open proxy (per instance). */
+const mcpLimiter = createRateLimiter(120, 60_000);
+
 export async function POST(req: NextRequest) {
+  const limited = mcpLimiter(clientIp(req));
+  if (!limited.ok) {
+    return NextResponse.json(
+      { error: "Rate limited — slow down, Chef." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(limited.retryAfterSec) },
+      },
+    );
+  }
+
   const wallet = req.headers.get("x-cookie-wallet") ?? "";
   if (wallet && !BASE58.test(wallet)) {
     return NextResponse.json(
@@ -75,6 +94,7 @@ export async function POST(req: NextRequest) {
       headers: {
         "content-type": "application/json",
         accept: "application/json, text/event-stream",
+        ...upstreamAuthHeaders(),
         ...(wallet ? { "x-cookie-wallet": wallet } : {}),
       },
       body: JSON.stringify({

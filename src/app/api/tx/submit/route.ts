@@ -3,6 +3,11 @@ import { VersionedTransaction, Transaction, type Connection } from "@solana/web3
 import { getConnection } from "@/lib/chain/connection";
 import { unwrapMcp } from "@/lib/mcp/shapes";
 import { pickKey } from "@/lib/utils/format";
+import {
+  clientIp,
+  createRateLimiter,
+  upstreamAuthHeaders,
+} from "@/lib/server/guard";
 
 /**
  * POST /api/tx/submit { signedTx, submit?, blockhash?, lastValidBlockHeight?, what? }
@@ -23,6 +28,12 @@ import { pickKey } from "@/lib/utils/format";
 
 const MCP_URL = process.env.MCP_HTTP_URL ?? "http://127.0.0.1:8787/mcp";
 const MCP_SUBMIT_TIMEOUT_MS = 25_000;
+
+/** Signed payloads are ~11k base64; this caps junk before JSON.parse. */
+const MAX_SUBMIT_BYTES = 64 * 1024;
+
+/** Money moves are human-paced — throttle relay abuse per instance. */
+const submitLimiter = createRateLimiter(20, 60_000);
 
 const MAX_TX_BYTES = 8192;
 const MIN_TX_BYTES = 64;
@@ -62,6 +73,7 @@ async function submitViaSidecar(args: {
       headers: {
         "content-type": "application/json",
         accept: "application/json, text/event-stream",
+        ...upstreamAuthHeaders(),
       },
       body: JSON.stringify({
         jsonrpc: "2.0",
@@ -168,6 +180,21 @@ async function submitDirect(
 }
 
 export async function POST(req: NextRequest) {
+  const limited = submitLimiter(clientIp(req));
+  if (!limited.ok) {
+    return NextResponse.json(
+      { error: "Rate limited — slow down, Chef." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(limited.retryAfterSec) },
+      },
+    );
+  }
+
+  const raw = await req.text().catch(() => "");
+  if (raw.length > MAX_SUBMIT_BYTES) {
+    return fail(413, "Request too large");
+  }
   let body: {
     signedTx?: unknown;
     submit?: unknown;
@@ -176,7 +203,7 @@ export async function POST(req: NextRequest) {
     what?: unknown;
   };
   try {
-    body = await req.json();
+    body = JSON.parse(raw || "{}");
   } catch {
     return fail(400, "Invalid JSON");
   }
@@ -244,13 +271,12 @@ export async function POST(req: NextRequest) {
       } catch (e) {
         const msg = e instanceof Error ? e.message : "submit failed";
         if (/already been processed|already processed|duplicate/i.test(msg)) {
-          return NextResponse.json({
-            error: "Transaction was already processed — check Cookiescan for a matching transfer before re-firing.",
+          return fail(409, "Transaction was already processed — check Cookiescan for a matching transfer before re-firing.", {
             duplicate: true as const,
           });
         }
         if (/blockhash not found|blockhash.*expired|expired/i.test(msg)) {
-          return fail(502, `Quote expired before submit (${msg}). Re-quote — do not resubmit.`, {
+          return fail(409, `Quote expired before submit (${msg}). Re-quote — do not resubmit.`, {
             expired: true as const,
           });
         }
@@ -258,7 +284,7 @@ export async function POST(req: NextRequest) {
       }
     }
     // Sidecar refused at the application level — do NOT fall back blindly.
-    if (via.expired) return fail(502, via.error, { expired: true as const });
+    if (via.expired) return fail(409, via.error, { expired: true as const });
     return fail(502, via.error);
   } catch (e) {
     return fail(502, e instanceof Error ? e.message : "submit failed");
