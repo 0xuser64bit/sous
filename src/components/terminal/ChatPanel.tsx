@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   callMcp,
@@ -134,6 +135,7 @@ const HELP_TEXT =
  */
 export function ChatPanel() {
   const { publicKey, signTransaction, signMessage } = useWallet();
+  const queryClient = useQueryClient();
   const messages = usePilotStore((s) => s.messages);
   const txPhase = usePilotStore((s) => s.txPhase);
   const push = usePilotStore((s) => s.push);
@@ -362,6 +364,13 @@ export function ChatPanel() {
     }
   }
 
+  /** Balances/orders/stake read stale the moment a fill lands — refetch them. */
+  function refreshPantry() {
+    void queryClient.invalidateQueries({ queryKey: ["balance"] });
+    void queryClient.invalidateQueries({ queryKey: ["limit_orders"] });
+    void queryClient.invalidateQueries({ queryKey: ["stake_info"] });
+  }
+
   function needWallet(): boolean {
     if (!publicKey || !signTransaction) {
       push({
@@ -476,6 +485,7 @@ export function ChatPanel() {
       if (msgId) updateQuote(msgId, { state: "fired", note: "Filled directly by the sidecar." });
       push({ role: "assistant", text: servedText(q) });
       setPhase("idle");
+      refreshPantry();
       return true;
     }
     const payload = res;
@@ -508,6 +518,7 @@ export function ChatPanel() {
     setSignature(sig);
     if (payload.step === "intermediate") return false;
     setPhase("confirmed");
+    refreshPantry();
     if (msgId) updateQuote(msgId, { state: "fired" });
     push({
       role: "assistant",
@@ -605,6 +616,7 @@ export function ChatPanel() {
         setPhase("idle");
         push({ role: "assistant", text: `Scrapped order ${orderId}.` });
       }
+      refreshPantry();
       toast.success("Order cancelled");
     } catch (e) {
       if (e instanceof TxError && e.code === "rejected") {
