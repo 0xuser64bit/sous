@@ -72,6 +72,9 @@ export function RowsError({ message, onRetry }: { message: string; onRetry: () =
 }
 
 export function sidecarHint(message: string): string {
+  if (/429|rate limit/i.test(message)) {
+    return "Too many requests — wait a few seconds and retry.";
+  }
   if (/502|timeout|abort|fetch|network/i.test(message)) {
     return "Sidecar unreachable — run cookie-mcp locally (see README).";
   }

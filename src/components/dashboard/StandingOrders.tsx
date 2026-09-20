@@ -84,6 +84,8 @@ export function StandingOrders() {
         signature ? `Scrapped · ${shortAddr(signature, 6)}` : "Order cancelled",
       );
       await queryClient.invalidateQueries({ queryKey: ["limit_orders", wallet] });
+      // Scrapping frees locked funds — the balances board reads stale otherwise.
+      await queryClient.invalidateQueries({ queryKey: ["balance"] });
     } catch (e) {
       if (e instanceof TxError && e.code === "rejected") {
         toast("Signature declined", { description: "Nothing moved." });
