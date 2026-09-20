@@ -225,6 +225,48 @@ export function poolBoard(payload: unknown, max = 5): { rows: DataRow[]; more: n
 }
 
 /**
+ * Single-token balance from a get_balance payload (live shape:
+ * { cook:{amount}, tokens:[{symbol,uiAmount}...] }). Returns null when the
+ * token isn't there or the number is unreadable — callers treat null as
+ * "unknown", never as zero.
+ */
+export function balanceOf(payload: unknown, symbol: string): number | null {
+  const data = unwrapMcp(payload);
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+  const o = data as Record<string, unknown>;
+  const num = (v: unknown): number | null => {
+    const n =
+      typeof v === "string"
+        ? Number(v.replace(/,/g, ""))
+        : typeof v === "number"
+          ? v
+          : NaN;
+    return Number.isFinite(n) ? n : null;
+  };
+  const amtKeys = ["uiAmount", "amount", "balance"];
+  const want = symbol.trim().toUpperCase();
+  if (want === "COOK" || want === "WCOOK") {
+    const cook = o.cook;
+    if (cook && typeof cook === "object" && !Array.isArray(cook)) {
+      return num(pickKey(cook as Record<string, unknown>, amtKeys));
+    }
+    if (typeof cook === "number" || typeof cook === "string") return num(cook);
+    return null;
+  }
+  const tokens = pickKey(o, ["tokens", "balances", "accounts"]);
+  if (!Array.isArray(tokens)) return null;
+  for (const t of tokens) {
+    if (!t || typeof t !== "object" || Array.isArray(t)) continue;
+    const to = t as Record<string, unknown>;
+    const sym = pickKey(to, ["symbol", "name"]);
+    if (typeof sym === "string" && sym.toUpperCase() === want) {
+      return num(pickKey(to, amtKeys));
+    }
+  }
+  return null;
+}
+
+/**
  * get_balance → rows, native COOK first then each SPL token. The native
  * `cook` balance is a sibling of `tokens[]`, so the generic list-or-map
  * heuristic would drop it whenever `tokens` is present (or empty) — this

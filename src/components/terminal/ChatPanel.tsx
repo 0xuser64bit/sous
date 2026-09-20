@@ -8,7 +8,7 @@ import {
   callMcp,
   isNeedsSignature,
 } from "@/lib/mcp/client";
-import { resolveMint } from "@/lib/mcp/tokens";
+import { resolveMint, type TokenMeta } from "@/lib/mcp/tokens";
 import { quoteBoth } from "@/lib/mcp/quotes";
 import {
   usePilotStore,
@@ -34,7 +34,7 @@ import {
   trimAmount,
   pickKey,
 } from "@/lib/utils/format";
-import { unwrapMcp, toRows, balanceRows } from "@/lib/mcp/shapes";
+import { unwrapMcp, toRows, balanceRows, balanceOf } from "@/lib/mcp/shapes";
 import { txUrl, addressUrl } from "@/lib/chain/explorer";
 import { CHAIN_META, NATIVE_COOK_MINT } from "@/lib/chain/config";
 
@@ -217,7 +217,7 @@ export function ChatPanel() {
           break;
         case "transfer": {
           const meta = await resolveMint(intent.token, wallet);
-          await proposeTicket({
+          const ticketId = proposeTicket({
             orderKind: "transfer",
             amount: intent.amount,
             from: meta.symbol,
@@ -230,6 +230,9 @@ export function ChatPanel() {
               : { to: intent.to, amount: intent.amount, mint: meta.mint },
             note: "Review the destination — sends cannot be undone.",
           });
+          // Non-blocking: warn on the ticket if the pantry can't cover it,
+          // so an empty wallet reads before signing, not after failing.
+          void preflightTransfer(ticketId, meta, intent.amount, wallet);
           break;
         }
         case "stake":
@@ -389,6 +392,37 @@ export function ChatPanel() {
       ticketNo: lastTicketNo(),
       quote: { ...q, state: "proposed" },
     });
+  }
+
+  /**
+   * Funds preflight for transfer tickets. Runs after the ticket posts so it
+   * never delays the quote; attaches a warning when the pantry can't cover
+   * the send. Silent on any failure — fire-time simulation stays the
+   * backstop, this only moves the diagnosis earlier.
+   */
+  async function preflightTransfer(
+    msgId: string,
+    meta: TokenMeta,
+    amount: number,
+    wallet?: string,
+  ) {
+    if (!wallet) return;
+    try {
+      const res = await callMcp({ tool: "get_balance", wallet, args: { wallet } });
+      const bal = balanceOf(res, meta.symbol);
+      if (bal === null) return;
+      if (bal < amount) {
+        updateQuote(msgId, {
+          warning: `Light pantry — you hold ${trimAmount(bal)} ${meta.symbol}, but this fires ${amount}. It will fail simulation until you top up.`,
+        });
+      } else if (meta.native && bal - amount < 0.001) {
+        updateQuote(msgId, {
+          warning: `Nearly your whole balance — nothing stays for fees. Fire a touch less than ${trimAmount(bal)} ${meta.symbol}.`,
+        });
+      }
+    } catch {
+      /* sidecar hiccup — the ticket still fires and simulates normally */
+    }
   }
 
   async function runSwap(intent: { amount: number; from: string; to: string }) {

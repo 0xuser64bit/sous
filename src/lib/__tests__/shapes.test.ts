@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { shortAddr, fmtNum, pickKey, trimAmount } from "../utils/format";
-import { unwrapMcp, toRows, str, mcpErrorMessage, balanceRows, poolBoard } from "../mcp/shapes";
+import { unwrapMcp, toRows, str, mcpErrorMessage, balanceRows, balanceOf, poolBoard } from "../mcp/shapes";
 
 describe("format", () => {
   it("shortens addresses", () => {
@@ -95,6 +95,26 @@ describe("balanceRows", () => {
       { label: "bCOOK", value: "3.2" },
       { label: "XyZ", value: "9" },
     ]);
+  });
+});
+
+describe("balanceOf", () => {
+  it("reads native COOK and SPL tokens (live shapes)", () => {
+    const raw = {
+      wallet: "Ek",
+      cook: { amount: "12.5", usdValue: 0 },
+      tokens: [{ symbol: "bCOOK", uiAmount: "3.2" }],
+      totalUsd: 0,
+    };
+    expect(balanceOf(raw, "COOK")).toBe(12.5);
+    expect(balanceOf(raw, "wcook")).toBe(12.5);
+    expect(balanceOf(raw, "bcook")).toBe(3.2);
+  });
+  it("returns null — never zero — for unknown or unreadable balances", () => {
+    expect(balanceOf({ cook: { amount: "0" }, tokens: [] }, "COOK")).toBe(0);
+    expect(balanceOf({ cook: { amount: "0" }, tokens: [] }, "USDC")).toBeNull();
+    expect(balanceOf({ cook: { amount: "n/a" }, tokens: [] }, "COOK")).toBeNull();
+    expect(balanceOf(null, "COOK")).toBeNull();
   });
 });
 
