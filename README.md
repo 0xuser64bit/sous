@@ -1,69 +1,83 @@
-# 👨‍🍳 Sous — Your sous-chef for Cookie Chain
+# Sous — your sous-chef for Cookie Chain
 
-> Sous preps, tastes, and plates your Cookie Chain moves: quotes, swaps,
-> stake, LPs, bridge. Nightly + Cookiebox + DAS + cookie-mcp (wallet-signed).
-> Yes, Chef!
+Sous preps, tastes, and plates your Cookie Chain moves: quotes, swaps,
+stake, limit orders, bridge. You review the ticket, sign in Nightly, get
+a Cookiescan receipt. Yes, Chef!
 
-**Bounty:** Build a cApp on Cookie Chain. This repo is the entry.
+Built for Cookie Chain traders and stakers — COOK / bCOOK holders, LP and
+limit-order users, bridge users, `.cook` name holders. Every money move is
+a real on-chain transaction signed by your own wallet; the app never holds
+keys.
 
-Name decided: **Sous** (sous-chef). Tagline: "Your sous-chef for Cookie Chain".
-Vibe: warm kitchen — chef's-hat cookie mark, amber/copper on dark, microcopy
-in kitchen voice (Preheating / Tasting / Plating / Yes, Chef!).
+## Quickstart
 
-## Quickstart (pnpm is the standard)
+Standard: `pnpm` only (see note below).
 
 ```bash
 cp .env.example .env
 pnpm install
-# terminal 1: MCP in external-signer mode (no keys in app process)
+# terminal 1: MCP sidecar in external-signer mode (no keys in the app process)
 COOKIE_SIGNER=external npx -y cookie-mcp --http 8787
 # terminal 2: web app
 pnpm dev
 ```
 
-Open http://localhost:3000 (landing) → **Launch the pass** → `/app` → Connect **Nightly** → ask `Quote 10 COOK -> bCOOK`.
+Open http://localhost:3000 → **Launch the pass** → `/app` → connect
+**Nightly** → try `Quote 10 COOK -> bCOOK`.
 
 Health checks: `pnpm chain:health` (RPC slot) and `GET /api/health`.
 
-> Why pnpm-only? Mixing npm + pnpm breaks installs. This repo standardizes on
-> pnpm (`packageManager: pnpm@11.24.0`). `package-lock.json` is removed on
-> purpose — do not reintroduce it. If `pnpm install` complains about
-> ignored build scripts, `pnpm-workspace.yaml > allowBuilds` already pins the
-> answer; don't hand-edit to placeholder strings.
+> pnpm-only: mixing npm + pnpm breaks installs. This repo standardizes on
+> pnpm (`packageManager: pnpm@11.24.0`). Do not reintroduce
+> `package-lock.json`. If `pnpm install` complains about ignored build
+> scripts, `pnpm-workspace.yaml > allowBuilds` already pins the answer.
 
 ## Scripts
 
 | cmd | what |
 |---|---|
 | `pnpm dev` | Next.js dev |
-| `pnpm build` | production build (must pass for submission) |
+| `pnpm build` | production build |
 | `pnpm lint` | eslint |
 | `pnpm typecheck` | tsc --noEmit |
 | `pnpm test` | vitest unit suite (intent, shapes, tx, slot) |
-| `pnpm chain:health` | RPC slot check (pnpm-safe, no npm vars) |
+| `pnpm chain:health` | RPC slot check |
 
-## Architecture
+## How it works
 
-See `docs/ARCHITECTURE.md`. TL;DR:
+See `docs/ARCHITECTURE.md` for the full flow and invariants. TL;DR:
 
-- `src/lib/chain/` — RPC, program IDs, explorer links. Single source of truth.
-- `src/app/api/mcp` — proxy to `cookie-mcp` (external-signer). Browser sends `{tool, args}` + `x-cookie-wallet`. Gets data or `{status:'needs_signature', transactionBase64}` (envelope unwrapped client-side).
-- `src/app/api/tx/submit` — single on-chain write path. Native `submit_signed_tx` first (sidecar knows the route submitter), direct-RPC fallback only when the sidecar is down, never retries expired quotes blindly.
-- `src/lib/mcp/` — validated proxy client (envelope unwrapped once, at the boundary), `tokens.ts` mint resolver (exact-match or refuse), `quotes.ts` dual-aggregator compare (cookiebox + cookiescan, survivor wins).
-- `src/lib/intent.ts` — local intent parser (swap/send/stake/limit/bridge/names/search). No network, no guessing with money.
-- `src/lib/tx/` — Nightly signing (transaction + message paths), typed `TxError` (rejected/expired/failed), shared limit-cancel flow.
-- `src/components/terminal/` — chat pass, paper `QuoteTicket` per money move, `TxPass` stepper (bounty-required feedback).
-- `src/components/dashboard/` — pantry (balances, stake quick-fire, standing orders) + market (chain pulse, pool board, live throughput sparkline).
-- `src/components/brand/` — `SousMark` (chef-hat cookie SVG), `SousLoader` (Preheating/Tasting/Plating).
+- `src/lib/chain/` — RPC, program IDs, explorer links. Single source of
+  truth; never hardcode chain constants in components.
+- `src/app/api/mcp` — proxy to `cookie-mcp` (external-signer). Browser sends
+  `{tool, args}` + `x-cookie-wallet`; new tools must be allowlisted both in
+  `src/app/api/mcp/route.ts` and `src/lib/mcp/client.ts`.
+- `src/app/api/tx/submit` — the single on-chain write path. Native
+  `submit_signed_tx` first, direct-RPC fallback only when the sidecar is
+  down; expired quotes 409 and are never retried blindly.
+- `src/lib/mcp/` — validated proxy client, mint resolver (exact-match or
+  refuse), dual-aggregator quoting (cookiebox + cookiescan, survivor wins).
+- `src/lib/intent.ts` — local intent parser
+  (swap/send/stake/limit/bridge/names/search). No network, no guessing with
+  money.
+- `src/lib/tx/` — Nightly signing (transaction + message paths), typed
+  `TxError` (rejected/expired/failed), shared limit-cancel flow.
+- `src/components/terminal/` — chat pass, paper `QuoteTicket` per money
+  move, `TxPass` stepper (`idle/quoting/awaiting_signature/sending/
+  confirming/confirmed/failed`).
+- `src/components/dashboard/` — pantry (balances, stake quick-fire,
+  standing orders) + market (chain pulse, pool board, live throughput
+  sparkline).
+- `src/components/brand/` — `SousMark` (chef-hat cookie SVG), `SousLoader`
+  (Preheating/Tasting/Plating).
 
-## Bounty fit
-
-See `docs/BOUNTY.md` — required features checklist + optional integrations + demo script.
+Design tokens and voice rules live in `docs/DESIGN.md`.
 
 ## Env
 
 - `NEXT_PUBLIC_*` = public chain endpoints (safe).
-- `MCP_HTTP_URL` = server-only URL to cookie-mcp. Never hold `COOKIE_PRIVATE_KEY` in web process.
+- `MCP_HTTP_URL` = server-only URL to cookie-mcp. Never hold
+  `COOKIE_PRIVATE_KEY` in the web process.
 
 ## Deploy
 
@@ -75,8 +89,25 @@ sidecar — point `MCP_HTTP_URL` at a hosted sidecar or the app degrades to
 honest per-action errors explaining the sidecar is down. Set env vars from
 `.env.example`. Wallet signing stays client-side via Nightly.
 
-## Submission (TODO)
+## Demo (60 seconds)
 
-- [ ] Live URL
-- [ ] Program/token addresses used (list in README before submit)
-- [ ] X thread + Telegram share
+1. Connect Nightly (show address).
+2. `Quote 10 COOK -> bCOOK` — ticket with venue + impact, fire in Nightly.
+3. Approve — confirming (~1s) → confirmed + Cookiescan link.
+4. Pantry: stake 5 via quick-fire ticket; `Limit sell 5 bCOOK → COOK at
+   2.0` → standing-orders board; scrap it.
+5. Punchline: "5 txs, <$0.01, seconds. Only possible on Cookie Chain."
+
+## Known limitations
+
+- Stop-loss trigger syntax and limit-order expiry countdowns need sidecar
+  order-schema support.
+- No token-history candles or portfolio PnL yet (needs a DAS read path).
+- No bridge-status board yet (`bridge_status` is proxied, just not
+  displayed).
+- No MomoSwap launchpad tab; no Baked Bazaar rewards.
+- `sous.cook` is unregistered (tier "long", ~1500 COOK as of 2026-09-19).
+
+## License
+
+MIT — see `LICENSE`.

@@ -139,7 +139,7 @@ export type BothQuotes = {
 };
 
 /**
- * Quote BOTH aggregators (TASKS 02 core). One failing venue never kills
+ * Quote BOTH aggregators. One failing venue never kills
  * the ticket — the survivor wins alone and the note says so.
  */
 export async function quoteBoth(opts: {

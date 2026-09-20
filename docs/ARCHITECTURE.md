@@ -50,11 +50,12 @@ resubmitted — the user re-fires for a fresh quote.
 
 ## Data sources
 - Reads: cookie-mcp tools (above) + live slot poll for the throughput sparkline.
-- Swaps: Cookiebox agg `https://agg.cookiebox.app` + Candy Shop venue line (full A/B compare pending sidecar quote shapes).
-- Solana side: bridge quote ticket + status tooling (status board pending).
+- Swaps: dual-aggregator `get_quote` (cookiebox + cookiescan, best-out wins,
+  loser shown as the also-quoted line; one failing venue never kills the ticket).
+- Solana side: bridge quote ticket + `bridge_status` tooling (status board pending).
 - DAS `https://api.cookiescan.io` base in config; token-history charts pending.
 
 ## Test strategy
 `pnpm test` (vitest, no DOM needed): intent parser, MCP shape helpers,
 slot unwrap, tx base64 codecs, cancel flow with mocked fetch.
-Sidecar/wallet flows are verified manually (see README demo + BOUNTY script).
+Sidecar/wallet flows are verified manually (see README demo script).
