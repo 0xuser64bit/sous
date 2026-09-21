@@ -169,7 +169,7 @@ describe("resolveMint", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("resolves via search and refuses ambiguity", async () => {
+  it("resolves a single exact ticker", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
@@ -182,6 +182,40 @@ describe("resolveMint", () => {
       ),
     );
     expect((await resolveMint("foo")).mint).toBe("11111111111111111111111111111111");
-    await expect(resolveMint("ba")).rejects.toThrow("ambiguous");
+  });
+
+  it("refuses when two mints share a ticker instead of picking one", async () => {
+    // Live on Cookie Chain: `MON` resolves to two different mints, one with
+    // liquidity and one without. Ranking them would be guessing with money.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        envelope({
+          results: [
+            { symbol: "MON", mint: "6H7xnYmomo111111111111111111111111", liquidityCook: 149, holderCount: 24 },
+            { symbol: "MON", mint: "9Zjw2Q346YoFdrrBBrdUsQ5yhESzGenCf8", liquidityCook: 0, holderCount: 6 },
+          ],
+        }),
+      ),
+    );
+    const err = await resolveMint("mon").catch((e: Error) => e);
+    expect(String(err)).toMatch(/2 mints use that ticker/);
+    // The user needs enough to tell them apart from the message alone.
+    expect(String(err)).toMatch(/149 COOK liq, 24 holders/);
+  });
+
+  it("refuses a prefix match rather than guessing the whole ticker", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => envelope({ results: [{ symbol: "COOKHOUSE", mint: "33333333333333333333333333333333" }] })),
+    );
+    await expect(resolveMint("cookh")).rejects.toThrow(/exact ticker/);
+  });
+
+  it("keeps the native mint native when pasted as an address", async () => {
+    // `transfer` omits `mint` for native COOK, and only native COOK bridges —
+    // so a pasted So111…112 must not read as an ordinary SPL token.
+    const meta = await resolveMint("So11111111111111111111111111111111111111112");
+    expect(meta).toMatchObject({ native: true, symbol: "COOK" });
   });
 });

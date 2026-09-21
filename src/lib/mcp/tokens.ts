@@ -1,6 +1,6 @@
 import { callMcp } from "./client";
 import { unwrapMcp, str } from "./shapes";
-import { pickKey, isAddressLike } from "@/lib/utils/format";
+import { pickKey, isAddressLike, shortAddr } from "@/lib/utils/format";
 import { NATIVE_COOK_MINT } from "@/lib/chain/config";
 
 export type TokenMeta = {
@@ -30,13 +30,32 @@ type SearchHit = {
   symbol?: unknown;
   name?: unknown;
   liquidityCook?: unknown;
+  holderCount?: unknown;
 };
 
+/** "MON 6H7xnY…momo (149 COOK liq, 24 holders)" — enough to tell two apart. */
+function describe(h: SearchHit): string {
+  const mint = String(h.mint);
+  const sym = typeof h.symbol === "string" && h.symbol ? h.symbol : "—";
+  const bits: string[] = [];
+  const liq = Number(h.liquidityCook);
+  if (Number.isFinite(liq)) bits.push(`${Math.round(liq)} COOK liq`);
+  const holders = Number(h.holderCount);
+  if (Number.isFinite(holders)) bits.push(`${holders} holders`);
+  const detail = bits.length ? ` (${bits.join(", ")})` : "";
+  return `${sym} ${shortAddr(mint, 6)}${detail}`;
+}
+
 /**
- * Resolve a user-typed token (symbol, name, or raw mint) to a mint via
- * the sidecar registry. Symbols must match exactly (case-insensitive);
- * anything ambiguous throws with the candidates instead of guessing —
- * the pass never guesses with money.
+ * Resolve a user-typed token (symbol or raw mint) to a mint via the sidecar
+ * registry.
+ *
+ * Tickers are not unique on-chain and imitating a real one is the cheapest
+ * attack there is — Cookie Chain currently carries two different mints
+ * answering to `MON`, one with liquidity and one without. So this refuses
+ * rather than ranks: an exact, single match or nothing. Fuzzy discovery
+ * belongs in the `search` intent, which is a read; this function only ever
+ * runs on a path that ends in a signature.
  */
 export async function resolveMint(
   input: string,
@@ -45,7 +64,14 @@ export async function resolveMint(
   const raw = input.trim();
   if (!raw) throw new Error("Empty token.");
   if (isAddressLike(raw)) {
-    return { mint: raw, symbol: raw.slice(0, 4) + "…" + raw.slice(-4), native: false };
+    // The native mint pasted as an address is still native: `transfer` omits
+    // `mint` for it and only native COOK can ride the bridge.
+    const native = raw === NATIVE_COOK_MINT;
+    return {
+      mint: raw,
+      symbol: native ? "COOK" : shortAddr(raw, 4),
+      native,
+    };
   }
   const key = raw.toUpperCase();
   const known = WELL_KNOWN[key] ?? mintCache.get(key);
@@ -56,30 +82,35 @@ export async function resolveMint(
   const list = Array.isArray(payload)
     ? payload
     : (pickKey(payload as Record<string, unknown>, ["results", "tokens", "data"]) as unknown);
-  if (!Array.isArray(list) || !list.length) {
-    throw new Error(`No token found for “${raw}” — check the ticker, Chef.`);
-  }
-  const hits = (list as SearchHit[]).filter(
+  const hits = (Array.isArray(list) ? (list as SearchHit[]) : []).filter(
     (h) => h && typeof h === "object" && typeof h.mint === "string",
   );
-  const exact = hits.filter(
-    (h) =>
-      String(h.symbol ?? "").toUpperCase() === key ||
-      String(h.name ?? "").toUpperCase() === key,
-  );
-  const pick = (exact.length ? exact : hits)[0];
-  if (!pick) throw new Error(`No token found for “${raw}”.`);
-  if (!exact.length && hits.length > 1) {
-    const names = hits
-      .slice(0, 3)
-      .map((h) => String(h.symbol ?? h.mint))
-      .join(", ");
-    throw new Error(`“${raw}” is ambiguous (${names}) — use an exact ticker or mint.`);
+  if (!hits.length) {
+    throw new Error(`No token found for “${raw}” — check the ticker, Chef.`);
   }
+
+  const exact = hits.filter((h) => String(h.symbol ?? "").toUpperCase() === key);
+
+  if (exact.length > 1) {
+    throw new Error(
+      `“${raw}” is not one token — ${exact.length} mints use that ticker: ${exact
+        .slice(0, 3)
+        .map(describe)
+        .join(" · ")}. Order by mint address so there is no doubt.`,
+    );
+  }
+  if (!exact.length) {
+    const near = hits.slice(0, 3).map((h) => String(h.symbol ?? h.mint)).join(", ");
+    throw new Error(
+      `No token has the exact ticker “${raw}”${near ? ` — closest: ${near}` : ""}. Use the exact ticker or a mint address.`,
+    );
+  }
+
+  const pick = exact[0];
   const meta: TokenMeta = {
     mint: String(pick.mint),
     symbol: String(pick.symbol ?? raw.toUpperCase()),
-    native: false,
+    native: String(pick.mint) === NATIVE_COOK_MINT,
   };
   mintCache.set(key, meta);
   return meta;
