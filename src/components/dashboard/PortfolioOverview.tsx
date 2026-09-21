@@ -5,7 +5,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { callMcp } from "@/lib/mcp/client";
-import { unwrapMcp, toRows, balanceRows } from "@/lib/mcp/shapes";
+import { balanceRows, stakeRows } from "@/lib/mcp/shapes";
 import { shortAddr } from "@/lib/utils/format";
 import { addressUrl } from "@/lib/chain/explorer";
 import { usePilotStore } from "@/lib/store/usePilotStore";
@@ -46,7 +46,7 @@ export function PortfolioOverview() {
   }
 
   const balRows = bal.data ? balanceRows(bal.data) : null;
-  const stakeRows = stake.data ? toRows(unwrapMcp(stake.data), 6) : null;
+  const staking = stake.data ? stakeRows(stake.data) : null;
 
   return (
     <div className="flex min-w-0 flex-col">
@@ -97,8 +97,8 @@ export function PortfolioOverview() {
             <RowsSkeleton lines={3} />
           ) : stake.isError ? (
             <RowsError message={sidecarHint(stake.error.message)} onRetry={() => void stake.refetch()} />
-          ) : stakeRows ? (
-            <DataRows rows={stakeRows.rows} more={stakeRows.more} />
+          ) : staking?.length ? (
+            <DataRows rows={staking} />
           ) : (
             <DataRows rows={[]} />
           )}

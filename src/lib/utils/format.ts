@@ -48,6 +48,25 @@ export function trimAmount(v: string | number | undefined | null, dp = 6): strin
   return truncated.toLocaleString("en-US", { maximumFractionDigits: dp });
 }
 
+/**
+ * A token balance, readable in a narrow column without lying about it.
+ *
+ * Amounts arrive as full-precision strings ("13639797.520541906") and a
+ * fixed decimal cap is wrong at both ends: four decimals erases a dust
+ * balance, nine turn a large one into noise. So the cap follows the
+ * magnitude — a number at or above 1 keeps four decimals, a number below it
+ * keeps every one it has, because there the decimals *are* the balance.
+ * Trailing zeros are dropped either way.
+ */
+export function fmtBalance(v: string | number | undefined | null): string {
+  if (v === undefined || v === null || v === "") return "—";
+  const n = typeof v === "string" ? Number(v.replace(/,/g, "")) : v;
+  if (!Number.isFinite(n)) return typeof v === "string" ? v : "—";
+  if (n === 0) return "0";
+  const digits = Math.abs(n) >= 1 ? 4 : 9;
+  return n.toLocaleString("en-US", { maximumFractionDigits: digits });
+}
+
 /** Basis points as a percentage: 500 -> "5%", 10 -> "0.1%". */
 export function bpsLabel(bps: number): string {
   if (!Number.isFinite(bps)) return "—";
@@ -62,7 +81,15 @@ export function numOrUndef(v: unknown): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-/** Best-effort pick of the first present key (case-insensitive). */
+/**
+ * Best-effort pick of the first usable key (case-insensitive).
+ *
+ * `null` counts as absent and falls through to the next candidate. The
+ * sidecar uses explicit nulls for "no value" all over its payloads —
+ * `get_balance` sends `symbol: null` for unnamed mints, `resolve_domain`
+ * sends `owner: null` for an unclaimed name — and treating those as present
+ * stops the fallback chain dead on the one key that has nothing in it.
+ */
 export function pickKey(
   data: Record<string, unknown>,
   names: string[],
@@ -70,7 +97,8 @@ export function pickKey(
   const lower: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(data)) lower[k.toLowerCase()] = v;
   for (const n of names) {
-    if (lower[n.toLowerCase()] !== undefined) return lower[n.toLowerCase()];
+    const v = lower[n.toLowerCase()];
+    if (v !== undefined && v !== null) return v;
   }
   return undefined;
 }

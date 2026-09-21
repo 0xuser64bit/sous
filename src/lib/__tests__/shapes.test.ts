@@ -1,6 +1,25 @@
 import { describe, expect, it } from "vitest";
 import { shortAddr, fmtNum, pickKey, trimAmount } from "../utils/format";
-import { unwrapMcp, toRows, str, mcpErrorMessage, balanceRows, balanceOf, poolBoard } from "../mcp/shapes";
+import {
+  unwrapMcp,
+  toRows,
+  str,
+  mcpErrorMessage,
+  balanceRows,
+  balanceOf,
+  poolBoard,
+  stakeRows,
+  limitOrderRows,
+  domainRows,
+  tokenSearchRows,
+} from "../mcp/shapes";
+import {
+  BALANCE,
+  BCOOK_MINT,
+  DOMAIN_AVAILABLE,
+  EMPTY_LIMIT_ORDERS,
+  STAKE_INFO,
+} from "./fixtures/sidecar";
 
 describe("format", () => {
   it("shortens addresses", () => {
@@ -174,5 +193,70 @@ describe("mcpErrorMessage", () => {
     expect(
       mcpErrorMessage({ result: { content: [{ text: '{"status":"needs_signature"}' }] } }),
     ).toBeNull();
+  });
+});
+
+describe("live payload rendering", () => {
+  it("names an unnamed mint by its address instead of 'token'", () => {
+    // get_balance sends symbol: null for mints with no metadata. pickKey used
+    // to treat that null as present, so the mint fallback never ran and the
+    // ledger showed anonymous rows.
+    const { rows } = balanceRows(BALANCE);
+    expect(rows).toEqual([
+      { label: "COOK", value: "0.007962162" },
+      { label: "bCOOK", value: "13,639,797.5205" },
+      { label: "3UZt…f7kk", value: "1" },
+    ]);
+  });
+
+  it("trims balances to a width the rail can hold", () => {
+    // "13639797.520541906" in a 300px column is a truncated blur.
+    expect(balanceRows(BALANCE).rows[1].value).toBe("13,639,797.5205");
+    // ...while a dust balance keeps every digit it has, because there the
+    // decimals are the whole number.
+    expect(balanceRows(BALANCE).rows[0].value).toBe("0.007962162");
+  });
+
+  it("leads stake_info with the numbers, not three program addresses", () => {
+    const rows = stakeRows(STAKE_INFO);
+    expect(rows.map((r) => r.label)).toEqual(["APY", "1 bCOOK", "Pool TVL", "Fees"]);
+    expect(rows[0].value).toBe("173.89%");
+    expect(rows[1].value).toBe("1.364449 COOK");
+    expect(rows[3].value).toBe("0.5% in · 2% out");
+    // Nothing a reader cannot act on.
+    expect(rows.some((r) => r.value.includes(STAKE_INFO.program))).toBe(false);
+  });
+
+  it("reports an empty order book as empty", () => {
+    // The payload still carries owner/fees/count, so the generic renderer
+    // produced one meaningless "fees …" row and the honest empty state never
+    // fired.
+    expect(limitOrderRows(EMPTY_LIMIT_ORDERS)).toEqual([]);
+    expect(toRows(EMPTY_LIMIT_ORDERS).rows).toEqual([{ label: "fees", value: "…" }]);
+  });
+
+  it("labels a resting order with its terms", () => {
+    const orders = limitOrderRows({
+      orders: [
+        { orderId: "abc", kind: "stop", amount: "5", from: "bCOOK", to: "COOK", price: "2" },
+      ],
+    });
+    expect(orders).toEqual([{ id: "abc", label: "stop 5 bCOOK → COOK @ 2" }]);
+  });
+
+  it("prices a .cook name in COOK, and keeps the sidecar's own answer", () => {
+    // The nested price used to collapse to its priceUsd: a bare "1.5" for a
+    // name that costs 15,000 COOK. `note` was dropped entirely.
+    const { rows, note } = domainRows(DOMAIN_AVAILABLE);
+    expect(rows).toContainEqual({ label: "Status", value: "available" });
+    expect(rows).toContainEqual({ label: "Price", value: "15.00K COOK (≈ $1.5)" });
+    expect(note).toMatch(/is available/);
+  });
+
+  it("hands search results a mint to order with", () => {
+    const { rows } = tokenSearchRows({
+      results: [{ mint: BCOOK_MINT, symbol: "bCOOK", liquidityCook: 2510.8 }],
+    });
+    expect(rows).toEqual([{ label: "bCOOK · 2,510.8 COOK liq", value: BCOOK_MINT }]);
   });
 });

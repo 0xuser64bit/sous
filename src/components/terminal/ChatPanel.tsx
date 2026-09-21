@@ -32,11 +32,19 @@ import {
   fmtClock,
   isAddressLike,
   trimAmount,
-  pickKey,
   bpsLabel,
   numOrUndef,
 } from "@/lib/utils/format";
-import { unwrapMcp, toRows, balanceRows, balanceOf } from "@/lib/mcp/shapes";
+import {
+  unwrapMcp,
+  toRows,
+  balanceRows,
+  balanceOf,
+  stakeRows,
+  limitOrderRows,
+  domainRows,
+  tokenSearchRows,
+} from "@/lib/mcp/shapes";
 import { txUrl, addressUrl } from "@/lib/chain/explorer";
 import { CHAIN_META, NATIVE_COOK_MINT } from "@/lib/chain/config";
 
@@ -640,7 +648,7 @@ export function ChatPanel() {
     setPhase("quoting");
     try {
       const res = await callMcp({ tool: "stake_info", args: {} });
-      const { rows, more } = toRows(unwrapMcp(res), 6);
+      const rows = stakeRows(res);
       push({
         role: "assistant",
         text: hint ?? "",
@@ -648,7 +656,6 @@ export function ChatPanel() {
           title: "bCOOK Staking",
           subtitle: "Cookiebox liquid stake",
           rows: rows.length ? rows : [{ label: "status", value: "no data from sidecar" }],
-          more,
         },
       });
     } finally {
@@ -665,15 +672,19 @@ export function ChatPanel() {
         args: wallet ? { owner: wallet } : {},
       });
       if (isNeedsSignature(res)) throw new TxError("failed", "Order book needs no signature — unexpected sidecar reply.");
-      const { rows, more } = toRows(unwrapMcp(res), 8);
-      if (!rows.length) {
+      const orders = limitOrderRows(res);
+      if (!orders.length) {
         push({ role: "assistant", text: "No standing orders, Chef — the book is clear." });
         return;
       }
       push({
         role: "assistant",
         text: "",
-        table: { title: "Standing orders", rows, more },
+        table: {
+          title: "Standing orders",
+          rows: orders.slice(0, 8).map((o) => ({ label: o.label, value: o.id })),
+          more: Math.max(0, orders.length - 8),
+        },
       });
     } finally {
       setPhase("idle");
@@ -727,33 +738,27 @@ export function ChatPanel() {
     try {
       const res = await callMcp({ tool: "resolve_domain", wallet, args: { name } });
       if (isNeedsSignature(res)) throw new TxError("failed", "Name lookup needs no signature — unexpected sidecar reply.");
-      const payload = unwrapMcp(res);
-      const addr = findAddress(payload);
-      if (addr) {
-        const { rows } = toRows(payload, 4);
-        // Unregistered names have an account but no owner — label honestly.
-        const rec = (payload && typeof payload === "object" ? payload : {}) as Record<string, unknown>;
-        const ownerRaw = pickKey(rec, ["owner"]);
-        const ownerAddr =
-          typeof ownerRaw === "string" && isAddressLike(ownerRaw.trim()) ? ownerRaw.trim() : null;
-        const shown = ownerAddr ?? addr;
+      const { rows, note } = domainRows(res);
+      if (!rows.length) {
+        const { rows: fallback, more } = toRows(unwrapMcp(res), 6);
         push({
           role: "assistant",
-          text: "",
+          text: note ?? "",
           table: {
             title: name,
-            subtitle: shortAddr(shown, 6),
-            rows: [{ label: ownerAddr ? "owner" : "account", value: shown }, ...rows.filter((r) => r.value !== shown).slice(0, 3)],
+            rows: fallback.length ? fallback : [{ label: "status", value: "not found" }],
+            more,
           },
         });
-      } else {
-        const { rows, more } = toRows(payload, 6);
-        push({
-          role: "assistant",
-          text: "",
-          table: { title: name, rows: rows.length ? rows : [{ label: "status", value: "not found" }], more },
-        });
+        return;
       }
+      push({
+        role: "assistant",
+        // The sidecar writes a plain-English answer here ("… is available —
+        // register it at …"). It used to be dropped on the floor.
+        text: note ?? "",
+        table: { title: name, rows },
+      });
     } finally {
       setPhase("idle");
     }
@@ -764,10 +769,12 @@ export function ChatPanel() {
     try {
       const res = await callMcp({ tool: "search_tokens", wallet, args: { query } });
       if (isNeedsSignature(res)) throw new TxError("failed", "Search needs no signature — unexpected sidecar reply.");
-      const { rows, more } = toRows(unwrapMcp(res), 8);
+      const { rows, more } = tokenSearchRows(res, 8);
       push({
         role: "assistant",
-        text: "",
+        // The mint is the point: an ambiguous ticker is refused at fire time
+        // and the user needs an address to order with.
+        text: rows.length ? "Tap a mint to open it on Cookiescan, or order by that address." : "",
         table: {
           title: `Tokens · ${query}`,
           rows: rows.length ? rows : [{ label: "status", value: "nothing found" }],

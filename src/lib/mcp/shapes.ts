@@ -1,4 +1,4 @@
-import { fmtNum, pickKey } from "@/lib/utils/format";
+import { fmtBalance, fmtNum, pickKey, shortAddr, trimAmount } from "@/lib/utils/format";
 
 /**
  * MCP responses arrive in different envelopes depending on transport
@@ -271,19 +271,24 @@ export function balanceOf(payload: unknown, symbol: string): number | null {
  * `cook` balance is a sibling of `tokens[]`, so the generic list-or-map
  * heuristic would drop it whenever `tokens` is present (or empty) — this
  * keeps it visible, which is the whole point of the ledger.
+ *
+ * Amounts arrive as full-precision strings ("13639797.520541906") and
+ * unnamed mints arrive with `symbol: null`; both get rendered for a 300px
+ * rail rather than dumped.
  */
 export function balanceRows(payload: unknown, max = 10): { rows: DataRow[]; more: number } {
   const data = unwrapMcp(payload);
   if (!data || typeof data !== "object" || Array.isArray(data)) return toRows(data, max);
   const o = data as Record<string, unknown>;
   const rows: DataRow[] = [];
+  const amtKeys = ["uiAmount", "amount", "balance"];
 
   const cook = o.cook;
   if (cook && typeof cook === "object") {
-    const amt = pickKey(cook as Record<string, unknown>, ["uiAmount", "amount", "balance"]);
-    if (amt !== undefined && amt !== null) rows.push({ label: "COOK", value: str(amt) });
+    const amt = pickKey(cook as Record<string, unknown>, amtKeys);
+    if (amt !== undefined) rows.push({ label: "COOK", value: fmtBalance(amt as string | number) });
   } else if (typeof cook === "number" || typeof cook === "string") {
-    rows.push({ label: "COOK", value: str(cook) });
+    rows.push({ label: "COOK", value: fmtBalance(cook) });
   }
 
   const tokens = pickKey(o, ["tokens", "balances", "accounts"]);
@@ -291,12 +296,184 @@ export function balanceRows(payload: unknown, max = 10): { rows: DataRow[]; more
     for (const t of tokens) {
       if (!t || typeof t !== "object") continue;
       const to = t as Record<string, unknown>;
-      const sym = str(pickKey(to, ["symbol", "name", "mint"]));
-      const amt = pickKey(to, ["uiAmount", "amount", "balance"]);
-      rows.push({ label: sym === "—" ? "token" : sym, value: amt === undefined ? "—" : str(amt) });
+      const sym = pickKey(to, ["symbol", "name"]);
+      const mint = pickKey(to, ["mint", "address"]);
+      // An unnamed mint is still worth showing — labelled by its address, so
+      // it is identifiable, instead of a row of anonymous "token" entries.
+      const label =
+        typeof sym === "string" && sym
+          ? sym
+          : typeof mint === "string"
+            ? shortAddr(mint, 4)
+            : "token";
+      const amt = pickKey(to, amtKeys);
+      rows.push({
+        label,
+        value: fmtBalance(amt as string | number | undefined),
+      });
     }
   }
 
   if (!rows.length) return toRows(data, max); // unknown shape — fall back
+  return { rows: rows.slice(0, max), more: Math.max(0, rows.length - max) };
+}
+
+/**
+ * stake_info → the four numbers a staker acts on.
+ *
+ * The raw payload leads with three addresses (bcookMint, stakePool,
+ * program), so the generic map renderer spent its whole row budget on
+ * things nobody can act on and pushed rate, APY, TVL and fees behind
+ * "+4 more".
+ */
+export function stakeRows(payload: unknown): DataRow[] {
+  const data = unwrapMcp(payload);
+  if (!data || typeof data !== "object" || Array.isArray(data)) return [];
+  const o = data as Record<string, unknown>;
+  const rows: DataRow[] = [];
+
+  const apy = pickKey(o, ["apyPct", "apy"]);
+  if (typeof apy === "number") {
+    rows.push({ label: "APY", value: `${apy.toFixed(2)}%` });
+  }
+  const rate = pickKey(o, ["rate"]);
+  if (typeof rate === "number" && rate > 0) {
+    rows.push({ label: "1 bCOOK", value: `${trimAmount(rate, 6)} COOK` });
+  }
+  const tvl = pickKey(o, ["tvlCook", "tvl"]);
+  if (tvl !== undefined) rows.push({ label: "Pool TVL", value: `${fmtNum(tvl)} COOK` });
+
+  const fees = pickKey(o, ["fees"]);
+  if (fees && typeof fees === "object" && !Array.isArray(fees)) {
+    const f = fees as Record<string, unknown>;
+    const dep = pickKey(f, ["depositPct"]);
+    const wit = pickKey(f, ["withdrawPct"]);
+    if (typeof dep === "number" || typeof wit === "number") {
+      rows.push({
+        label: "Fees",
+        value: `${typeof dep === "number" ? `${dep}% in` : "—"} · ${
+          typeof wit === "number" ? `${wit}% out` : "—"
+        }`,
+      });
+    }
+  }
+  return rows;
+}
+
+/** One resting limit/stop order, as both the board and the pass render it. */
+export type StandingOrder = { id: string; label: string };
+
+/**
+ * get_limit_orders → resting orders, or an empty list.
+ *
+ * Empty is the common case and it matters: the payload still carries
+ * `{ owner, fees, count, orders: [] }`, so the generic map renderer
+ * produced a single meaningless "fees …" row and the honest "the book is
+ * clear" message never fired.
+ */
+export function limitOrderRows(payload: unknown): StandingOrder[] {
+  const data = unwrapMcp(payload);
+  const list = Array.isArray(data)
+    ? data
+    : data && typeof data === "object"
+      ? (pickKey(data as Record<string, unknown>, ["orders", "items", "data", "results"]) as unknown)
+      : null;
+  if (!Array.isArray(list)) return [];
+  return list.flatMap((item, i): StandingOrder[] => {
+    if (!item || typeof item !== "object") return [];
+    const o = item as Record<string, unknown>;
+    const id = pickKey(o, ["orderId", "order_id", "id", "address", "pubkey"]);
+    if (typeof id !== "string" && typeof id !== "number") return [];
+    const amount = pickKey(o, ["amount", "inAmount", "quantity"]);
+    const from = pickKey(o, ["from", "inputSymbol", "input", "sell"]);
+    const to = pickKey(o, ["to", "outputSymbol", "output", "buy"]);
+    const price = pickKey(o, ["price", "limitPrice", "triggerPrice"]);
+    const kind = pickKey(o, ["kind"]);
+    const bits = [
+      typeof kind === "string" && kind.toLowerCase() === "stop" ? "stop" : null,
+      amount !== undefined ? fmtBalance(amount as string | number) : null,
+      typeof from === "string" ? from : null,
+      typeof to === "string" ? `→ ${to}` : null,
+      price !== undefined ? `@ ${trimAmount(price as string | number)}` : null,
+    ].filter(Boolean);
+    return [{ id: String(id), label: bits.length ? bits.join(" ") : `#${i + 1}` }];
+  });
+}
+
+/**
+ * resolve_domain → a card a reader can act on.
+ *
+ * The generic renderer dropped `note` (it is in SKIP_KEYS) and collapsed
+ * the nested `price` to its `priceUsd`, printing a bare "1.5" for a name
+ * that costs 15,000 COOK. Names are the one place the sidecar writes a
+ * plain-English answer; show it.
+ */
+export function domainRows(payload: unknown): { rows: DataRow[]; note?: string } {
+  const data = unwrapMcp(payload);
+  if (!data || typeof data !== "object" || Array.isArray(data)) return { rows: [] };
+  const o = data as Record<string, unknown>;
+  const rows: DataRow[] = [];
+
+  const registered = pickKey(o, ["registered"]);
+  const owner = pickKey(o, ["owner"]);
+  if (typeof owner === "string" && owner) {
+    rows.push({ label: "Owner", value: owner });
+  } else if (registered === false) {
+    rows.push({ label: "Status", value: "available" });
+  } else {
+    const account = pickKey(o, ["account"]);
+    if (typeof account === "string") rows.push({ label: "Account", value: account });
+  }
+
+  const price = pickKey(o, ["price"]);
+  if (price && typeof price === "object" && !Array.isArray(price)) {
+    const p = price as Record<string, unknown>;
+    const cook = pickKey(p, ["priceCook"]);
+    const usd = pickKey(p, ["priceUsd"]);
+    if (cook !== undefined) {
+      // COOK is what the registry charges; USD is the aside, not the price.
+      const usdPart = typeof usd === "number" ? ` (≈ $${usd.toLocaleString("en-US", { maximumFractionDigits: 2 })})` : "";
+      rows.push({ label: "Price", value: `${fmtNum(cook)} COOK${usdPart}` });
+    }
+    const tier = pickKey(p, ["tier"]);
+    if (typeof tier === "string") rows.push({ label: "Tier", value: tier });
+  }
+
+  const created = pickKey(o, ["createdAt"]);
+  if (typeof created === "string") rows.push({ label: "Registered", value: created.slice(0, 10) });
+
+  const note = pickKey(o, ["note"]);
+  return { rows, note: typeof note === "string" ? note : undefined };
+}
+
+/**
+ * search_tokens → symbol and liquidity in the label, mint as the value.
+ *
+ * The mint is the actionable part: resolveMint refuses an ambiguous ticker
+ * and tells the user to order by address, so search has to hand them one.
+ */
+export function tokenSearchRows(payload: unknown, max = 8): { rows: DataRow[]; more: number } {
+  const data = unwrapMcp(payload);
+  const list = Array.isArray(data)
+    ? data
+    : data && typeof data === "object"
+      ? (pickKey(data as Record<string, unknown>, ["results", "tokens", "data"]) as unknown)
+      : null;
+  if (!Array.isArray(list)) return { rows: [], more: 0 };
+  const rows = list.flatMap((item): DataRow[] => {
+    if (!item || typeof item !== "object") return [];
+    const o = item as Record<string, unknown>;
+    const mint = pickKey(o, ["mint", "address"]);
+    if (typeof mint !== "string") return [];
+    const sym = pickKey(o, ["symbol", "name"]);
+    const liq = pickKey(o, ["liquidityCook", "liquidityUsd", "tvlUsd"]);
+    const label =
+      typeof liq === "number"
+        ? `${typeof sym === "string" ? sym : "—"} · ${fmtNum(liq)} COOK liq`
+        : typeof sym === "string"
+          ? sym
+          : "—";
+    return [{ label, value: mint }];
+  });
   return { rows: rows.slice(0, max), more: Math.max(0, rows.length - max) };
 }

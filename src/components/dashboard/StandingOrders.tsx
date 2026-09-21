@@ -5,48 +5,12 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { callMcp } from "@/lib/mcp/client";
-import { unwrapMcp, str } from "@/lib/mcp/shapes";
-import { pickKey, shortAddr } from "@/lib/utils/format";
+import { limitOrderRows } from "@/lib/mcp/shapes";
+import { shortAddr } from "@/lib/utils/format";
 import { cancelLimitOrder } from "@/lib/tx/cancelOrder";
 import { TxError } from "@/lib/tx/signAndSend";
 import { Section } from "@/components/layout/Section";
 import { RowsSkeleton, RowsError, sidecarHint } from "@/components/layout/DataRows";
-
-type StandingOrder = { id: string; label: string };
-
-function toOrders(payload: unknown): StandingOrder[] {
-  const data = payload;
-  const list = Array.isArray(data)
-    ? data
-    : data && typeof data === "object"
-      ? (pickKey(data as Record<string, unknown>, [
-          "orders",
-          "items",
-          "data",
-          "results",
-        ]) as unknown)
-      : null;
-  if (!Array.isArray(list)) return [];
-  return list.flatMap((item, i): StandingOrder[] => {
-    if (!item || typeof item !== "object") return [];
-    const o = item as Record<string, unknown>;
-    const id = pickKey(o, ["orderId", "order_id", "id", "address", "pubkey"]);
-    if (typeof id !== "string" && typeof id !== "number") return [];
-    const amount = pickKey(o, ["amount", "inAmount", "quantity"]);
-    const from = pickKey(o, ["from", "input", "sell"]);
-    const to = pickKey(o, ["to", "output", "buy"]);
-    const price = pickKey(o, ["price", "limitPrice", "triggerPrice"]);
-    const bits = [
-      amount !== undefined ? str(amount) : null,
-      typeof from === "string" ? from : null,
-      typeof to === "string" ? `→ ${to}` : null,
-      price !== undefined ? `@ ${str(price)}` : null,
-    ].filter(Boolean);
-    return [
-      { id: String(id), label: bits.length ? bits.join(" ") : `#${i + 1}` },
-    ];
-  });
-}
 
 /**
  * Standing limit/stop orders for this wallet, with one-tap cancel.
@@ -69,7 +33,7 @@ export function StandingOrders() {
   });
 
   if (!wallet) return null;
-  const list = orders.data ? toOrders(unwrapMcp(orders.data)) : [];
+  const list = orders.data ? limitOrderRows(orders.data) : [];
 
   async function onCancel(id: string) {
     if (!signTransaction || cancelling) return;
