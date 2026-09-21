@@ -1,0 +1,27 @@
+# One VM, two containers: the app (Next.js + cookie-mcp on loopback inside it)
+# and Caddy terminating TLS. The app publishes no ports — Caddy reaches it over
+# the compose network, so the only things on the public internet are 80/443.
+services:
+  app:
+    build: .
+    environment:
+      PORT: 3000
+      SOLANA_RPC_URL: ${SOLANA_RPC_URL:-https://api.mainnet-beta.solana.com}
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SOUS_DOMAIN: ${SOUS_DOMAIN:?set SOUS_DOMAIN to the hostname Caddy should get a cert for}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    restart: unless-stopped
+
+volumes:
+  # Persists the Let's Encrypt cert. Without it every restart re-issues and
+  # you hit the rate limit.
+  caddy_data:

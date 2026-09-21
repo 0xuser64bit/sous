@@ -9,6 +9,14 @@ limit-order users, bridge users, `.cook` name holders. Every money move is
 a real on-chain transaction signed by your own wallet; the app never holds
 keys.
 
+![Sous landing — every money move is a paper ticket you read before you sign](docs/screenshots/landing.png)
+
+<p align="center"><em>Every money move prints a paper ticket — estimate, guaranteed floor, venue, both fees — before the wallet ever opens.</em></p>
+
+![The pass — live chain stats and pool board, read-only until Nightly connects](docs/screenshots/pass.png)
+
+<p align="center"><em>The pass: live slot, epoch and pool board render before you connect. Browsing is free; only firing needs a wallet.</em></p>
+
 ## Quickstart
 
 Standard: `pnpm` only (see note below).
@@ -91,12 +99,35 @@ Design tokens and voice rules live in `docs/DESIGN.md`.
 ## Deploy
 
 The app is only as live as its sidecar: every read, quote, and fill goes
-through cookie-mcp in external-signer mode. Host the web app and the sidecar
-together (Railway / Fly with two processes, `MCP_HTTP_URL` pointing at the
-sidecar + `MCP_AUTH_TOKEN` set on both ends). Vercel alone cannot run the
-sidecar — point `MCP_HTTP_URL` at a hosted sidecar or the app degrades to
-honest per-action errors explaining the sidecar is down. Set env vars from
-`.env.example`. Wallet signing stays client-side via Nightly.
+through cookie-mcp in external-signer mode.
+
+`cookie-mcp` defaults to binding `127.0.0.1` (`--host` changes it) and has
+**no authentication of its own** — no token flag, no auth env var. Anything
+that can reach it can build transactions for any wallet. So the default
+topology keeps it on loopback, sharing a container with the web app, where
+nothing outside the container can reach it at all. The `Dockerfile` does
+exactly that: cookie-mcp on loopback, Next.js on `$PORT`, the sidecar baked
+into the image at build time so boot never depends on the npm registry.
+
+```bash
+docker build -t sous .
+docker run -p 3000:3000 -e PORT=3000 sous
+```
+
+Any Dockerfile host works (Railway, Render, Fly). Set `SOLANA_RPC_URL` for
+the sidecar's bridge and `chain:"solana"` quotes; every other value in
+`.env.example` has a working default.
+
+Because the sidecar only listens on loopback, `/api/mcp` is the sole way in
+and its tool allowlist is the whole perimeter.
+
+Splitting the two across hosts (app on Vercel, sidecar on a VM) works, but
+the sidecar then needs a reverse proxy that both terminates TLS and enforces
+auth — `MCP_AUTH_TOKEN` is forwarded by this app as `Authorization: Bearer`,
+but cookie-mcp never checks it, so the proxy has to. Vercel alone cannot run
+the sidecar: point `MCP_HTTP_URL` at a hosted one or the app degrades to
+honest per-action errors explaining the sidecar is down. Wallet signing
+stays client-side via Nightly.
 
 ## Verifying against a real sidecar
 

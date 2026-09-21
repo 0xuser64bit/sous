@@ -6,10 +6,13 @@ Sous moves real money, so the trust boundary is explicit:
   The `cookie-mcp` sidecar runs keyless (`COOKIE_SIGNER=external`) and only
   returns unsigned transactions; signing happens client-side in the user's
   Nightly wallet.
-- **Sidecar auth.** When the sidecar is hosted, set the same
-  `MCP_AUTH_TOKEN` on both ends; the app forwards it as
-  `Authorization: Bearer <token>`. Never expose the sidecar to the public
-  internet without it.
+- **The sidecar authenticates nothing.** `cookie-mcp` has no auth flag and
+  no auth env var; it will serve anyone who can reach it. `MCP_AUTH_TOKEN`
+  is forwarded by this app as `Authorization: Bearer <token>`, but the
+  sidecar never checks it — a reverse proxy in front of it has to. The
+  supported deployment keeps the sidecar on loopback inside the app's own
+  container (see the `Dockerfile`), where nothing outside can reach it.
+  Bind it wider (`--host`) only behind a proxy that enforces auth.
 - **Proxy hardening.** `/api/mcp` allowlists tools and validates
   wallet/body/args; `/api/tx/submit` caps body size, rate-limits, and
   returns 409 (never retry) on expired/duplicate submissions.
