@@ -30,10 +30,27 @@ describe("clientIp", () => {
   const req = (headers: Record<string, string>) =>
     new Request("http://localhost/api/mcp", { headers });
 
-  it("prefers the first x-forwarded-for entry", () => {
-    expect(
-      clientIp(req({ "x-forwarded-for": "1.2.3.4, 5.6.7.8" })),
-    ).toBe("1.2.3.4");
+  it("reads the hop our proxy appended, not the one the caller sent", () => {
+    // Caddy appends, so the rightmost entry is the real peer. Taking the
+    // leftmost took whatever the caller put there.
+    expect(clientIp(req({ "x-forwarded-for": "1.2.3.4, 5.6.7.8" }))).toBe("5.6.7.8");
+  });
+
+  it("cannot be shaken off by seeding the header", () => {
+    // Same caller, different spoofed prefixes: one bucket, or the limiter
+    // is decorative on the one route that is an open relay.
+    const seen = new Set(
+      ["9.9.9.9", "8.8.8.8", "7.7.7.7"].map((spoof) =>
+        clientIp(req({ "x-forwarded-for": `${spoof}, 203.0.113.7` })),
+      ),
+    );
+    expect([...seen]).toEqual(["203.0.113.7"]);
+  });
+
+  it("handles a single-hop header and stray whitespace", () => {
+    expect(clientIp(req({ "x-forwarded-for": "203.0.113.7" }))).toBe("203.0.113.7");
+    expect(clientIp(req({ "x-forwarded-for": " 1.1.1.1 ,  203.0.113.7 " }))).toBe("203.0.113.7");
+    expect(clientIp(req({ "x-forwarded-for": " , " }))).toBe("local");
   });
 
   it("falls back to x-real-ip, then local", () => {
