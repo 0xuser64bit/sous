@@ -1,7 +1,8 @@
 // pnpm-safe chain health check (no $npm_config_* vars).
 // Usage: pnpm chain:health
 const rpc =
-  process.env.NEXT_PUBLIC_COOKIE_RPC_URL ?? "https://rpc.cookiescan.io";
+  (process.env.NEXT_PUBLIC_COOKIE_RPC_URL ?? "").trim() ||
+  "https://rpc.cookiescan.io";
 
 try {
   const res = await fetch(rpc, {

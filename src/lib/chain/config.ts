@@ -9,8 +9,10 @@
  * programs it needs itself.
  */
 
-export const COOKIE_RPC_URL =
-  process.env.NEXT_PUBLIC_COOKIE_RPC_URL ?? "https://rpc.cookiescan.io";
+export const COOKIE_RPC_URL = cleanHttpEnv(
+  process.env.NEXT_PUBLIC_COOKIE_RPC_URL,
+  "https://rpc.cookiescan.io",
+);
 
 /**
  * Websocket endpoint. Defaults to the RPC host with a wss:// scheme
@@ -22,11 +24,31 @@ export const COOKIE_RPC_URL =
  * later does subscribe cannot silently pick the wrong host.
  */
 export const COOKIE_WSS_URL =
-  process.env.NEXT_PUBLIC_COOKIE_WSS_URL ??
-  COOKIE_RPC_URL.replace(/^http/, "ws");
+  cleanWsEnv(
+    process.env.NEXT_PUBLIC_COOKIE_WSS_URL,
+    COOKIE_RPC_URL.replace(/^http/, "ws"),
+  );
 
-export const COOKIESCAN_BASE =
-  process.env.NEXT_PUBLIC_COOKIESCAN_BASE ?? "https://cookiescan.io";
+export const COOKIESCAN_BASE = cleanHttpEnv(
+  process.env.NEXT_PUBLIC_COOKIESCAN_BASE,
+  "https://cookiescan.io",
+);
+
+/**
+ * Empty-string env vars are real on Vercel (a variable added without a
+ * value) and `??` does not catch them — `""` sailed through and `new
+ * Connection("")` killed the static prerender of `/` with
+ * "Endpoint URL must start with http: or https:". Trim and fall back.
+ */
+function cleanHttpEnv(raw: string | undefined, fallback: string): string {
+  const v = (raw ?? "").trim();
+  return /^https?:\/\/.+/.test(v) ? v : fallback;
+}
+
+function cleanWsEnv(raw: string | undefined, fallback: string): string {
+  const v = (raw ?? "").trim();
+  return /^(wss?|https?):\/\/.+/.test(v) ? v : fallback;
+}
 
 export const APP_TAGLINE = "Your sous-chef for Cookie Chain";
 
