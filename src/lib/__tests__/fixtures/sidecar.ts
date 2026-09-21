@@ -149,6 +149,33 @@ export const DOMAIN_AVAILABLE = {
   note: "sous.cook is available — register_domain claims it, or register it at https://book.cookoven.xyz",
 } as const;
 
+/**
+ * `resolve_domain` for a name listed on the marketplace. `owner` is the
+ * escrow program account, NOT a payable wallet — the real counterparty is
+ * `forSale.seller`.
+ */
+export const DOMAIN_LISTED = {
+  name: "chef.cook",
+  label: "chef",
+  account: "CccydEN26AZS9WRCLXcomze4snWuve7TLQZMDobr4wwy",
+  registered: true,
+  owner: "7rQTSWbk1nMRPve2q3wcS1rT6g2shkXkNDGnZX53zEzR",
+  isOwnersPrimary: null,
+  resolver: null,
+  metadata: null,
+  createdAt: "2026-05-04T13:32:51.000Z",
+  price: null,
+  forSale: {
+    priceCook: "5000000",
+    priceLamports: "5000000000000000",
+    seller: "AmZDfCaqwzqnCiiu3Go91BJGctrKsUBQS4ydR3SAao7i",
+    listing: "ENksYVghnQut43txiNAeNbTBnTemMS1S8MUT5nxtpxNw",
+    listedAt: "2026-08-10T19:22:38.000Z",
+    marketUrl: "https://market.cookoven.xyz",
+  },
+  note: "chef.cook is FOR SALE at 5000000 COOK — buy_domain claims it. `owner` above is the marketplace escrow account, not a wallet: do not send funds to it, the seller is AmZDfCaqwzqnCiiu3Go91BJGctrKsUBQS4ydR3SAao7i.",
+} as const;
+
 /** `chain_health` — no top-level `slot`; the number lives in two places. */
 export const CHAIN_HEALTH = {
   healthy: true,

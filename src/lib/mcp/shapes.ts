@@ -436,8 +436,18 @@ export function domainRows(payload: unknown): { rows: DataRow[]; note?: string }
 
   const registered = pickKey(o, ["registered"]);
   const owner = pickKey(o, ["owner"]);
+  const forSale = pickKey(o, ["forSale"]);
+  const sale =
+    forSale && typeof forSale === "object" && !Array.isArray(forSale)
+      ? (forSale as Record<string, unknown>)
+      : null;
+
   if (typeof owner === "string" && owner) {
-    rows.push({ label: "Owner", value: owner });
+    // A listed name is held by the marketplace escrow, and the registry
+    // reports that escrow as the owner. Calling a program account "Owner"
+    // in an app whose main verb is "send money to a name" is how funds get
+    // stranded — name it, and name the human behind it.
+    rows.push({ label: sale ? "Escrow (listed)" : "Owner", value: owner });
   } else if (registered === false) {
     rows.push({ label: "Status", value: "available" });
   } else {
@@ -457,6 +467,13 @@ export function domainRows(payload: unknown): { rows: DataRow[]; note?: string }
     }
     const tier = pickKey(p, ["tier"]);
     if (typeof tier === "string") rows.push({ label: "Tier", value: tier });
+  }
+
+  if (sale) {
+    const seller = pickKey(sale, ["seller"]);
+    if (typeof seller === "string") rows.push({ label: "Seller", value: seller });
+    const asking = pickKey(sale, ["priceCook"]);
+    if (asking !== undefined) rows.push({ label: "Asking", value: `${fmtNum(asking)} COOK` });
   }
 
   const created = pickKey(o, ["createdAt"]);

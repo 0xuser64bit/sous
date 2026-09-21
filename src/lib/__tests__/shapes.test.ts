@@ -17,6 +17,7 @@ import {
   BALANCE,
   BCOOK_MINT,
   DOMAIN_AVAILABLE,
+  DOMAIN_LISTED,
   EMPTY_LIMIT_ORDERS,
   STAKE_INFO,
 } from "./fixtures/sidecar";
@@ -253,6 +254,20 @@ describe("live payload rendering", () => {
     expect(rows).toContainEqual({ label: "Status", value: "available" });
     expect(rows).toContainEqual({ label: "Price", value: "15.00K COOK (≈ $1.5)" });
     expect(note).toMatch(/is available/);
+  });
+
+  it("never calls a marketplace escrow the owner", () => {
+    // A listed name is held by the escrow program and the registry reports
+    // it as `owner`. In an app whose main verb is "send money to a name",
+    // printing that as Owner is how funds get stranded.
+    const { rows, note } = domainRows(DOMAIN_LISTED);
+    expect(rows).toContainEqual({
+      label: "Escrow (listed)",
+      value: DOMAIN_LISTED.owner,
+    });
+    expect(rows).toContainEqual({ label: "Seller", value: DOMAIN_LISTED.forSale.seller });
+    expect(rows).toContainEqual({ label: "Asking", value: "5.00M COOK" });
+    expect(note).toMatch(/do not send funds to it/);
   });
 
   it("hands search results a mint to order with", () => {

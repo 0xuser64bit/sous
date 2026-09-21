@@ -409,12 +409,22 @@ export function ChatPanel() {
   }
 
   async function runOrders() {
+    if (!wallet) {
+      // Without an owner the sidecar answers with its own configuration
+      // error ("no wallet configured and no owner given"), which is not an
+      // answer to "my orders".
+      push({
+        role: "system",
+        text: "Connect Nightly first — the order book is read per wallet.",
+      });
+      return;
+    }
     setPhase("quoting");
     try {
       const res = await callMcp({
         tool: "get_limit_orders",
         wallet,
-        args: wallet ? { owner: wallet } : {},
+        args: { owner: wallet },
       });
       if (isNeedsSignature(res)) throw new TxError("failed", "Order book needs no signature — unexpected sidecar reply.");
       const orders = limitOrderRows(res);
