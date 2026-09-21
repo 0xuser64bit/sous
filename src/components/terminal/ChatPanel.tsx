@@ -18,7 +18,7 @@ import {
   buildSwapTicket,
   buildTransferTicket,
   buildUnstakeTicket,
-  transferPreflight,
+  fundsPreflight,
   type TicketDraft,
 } from "@/lib/pass/tickets";
 import { parseIntent, isTemplateOrder, EXAMPLE_ORDERS, type Intent } from "@/lib/intent";
@@ -193,7 +193,7 @@ export function ChatPanel() {
           setPhase("idle");
           break;
         case "transfer":
-          await post(await buildTransferTicket(intent, wallet), intent.amount);
+          await post(await buildTransferTicket(intent, wallet));
           break;
         case "stake":
           // "stake" with no amount is a question about staking, not an order.
@@ -255,14 +255,16 @@ export function ChatPanel() {
    * carries the token it resolved so the funds check can run behind the
    * ticket rather than delaying it.
    */
-  async function post(draft: TicketDraft, amount?: number) {
+  async function post(draft: TicketDraft) {
     if (draft.kind === "say") {
       push({ role: "assistant", text: draft.text });
       return;
     }
     const id = proposeTicket(draft.quote);
-    if (draft.preflight && amount !== undefined) {
-      void transferPreflight(draft.preflight, amount, wallet).then((warning) => {
+    // The amount rides on the ticket itself, so every builder that declares
+    // what it spends gets the funds check — no call site has to remember.
+    if (draft.preflight && draft.quote.amount !== undefined) {
+      void fundsPreflight(draft.preflight, draft.quote.amount, wallet).then((warning) => {
         if (warning) updateQuote(id, { warning });
       });
     }

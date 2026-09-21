@@ -13,7 +13,7 @@ import { resolveMint, type TokenMeta } from "@/lib/mcp/tokens";
 import { quoteBoth } from "@/lib/mcp/quotes";
 import { callMcp } from "@/lib/mcp/client";
 import { balanceOf } from "@/lib/mcp/shapes";
-import { NATIVE_COOK_MINT } from "@/lib/chain/config";
+import { BCOOK_MINT, NATIVE_COOK_MINT } from "@/lib/chain/config";
 import { bpsLabel, numOrUndef, shortAddr, trimAmount, isAddressLike } from "@/lib/utils/format";
 import type { QuoteData } from "@/lib/store/usePilotStore";
 import type {
@@ -71,6 +71,7 @@ export async function buildSwapTicket(
   });
   return {
     kind: "ticket",
+    preflight: inMeta,
     quote: {
       orderKind: "swap",
       amount: intent.amount,
@@ -140,6 +141,7 @@ export async function buildTransferTicket(
 export function buildStakeTicket(intent: StakeIntent & { amount: number }): TicketDraft {
   return {
     kind: "ticket",
+    preflight: { mint: NATIVE_COOK_MINT, symbol: "COOK", native: true },
     quote: {
       orderKind: "stake",
       amount: intent.amount,
@@ -155,6 +157,7 @@ export function buildStakeTicket(intent: StakeIntent & { amount: number }): Tick
 export function buildUnstakeTicket(intent: UnstakeIntent & { amount: number }): TicketDraft {
   return {
     kind: "ticket",
+    preflight: { mint: BCOOK_MINT, symbol: "bCOOK", native: false },
     quote: {
       orderKind: "unstake",
       amount: intent.amount,
@@ -177,6 +180,7 @@ export async function buildLimitTicket(
   ]);
   return {
     kind: "ticket",
+    preflight: inMeta,
     quote: {
       orderKind: "limit",
       amount: intent.amount,
@@ -242,12 +246,17 @@ export async function buildBridgeTicket(
 }
 
 /**
- * Funds check for a transfer ticket. Runs after the ticket posts so it
- * never delays the quote, and returns a warning to pin on it. Silent on any
- * failure — fire-time simulation stays the backstop; this only moves the
- * diagnosis to before the wallet opens.
+ * Funds check for any ticket that spends a token. Runs after the ticket
+ * posts so it never delays the quote, and returns a warning to pin on it.
+ * Silent on any failure — fire-time simulation stays the backstop; this only
+ * moves the diagnosis to before the wallet opens.
+ *
+ * Worth the wiring: an unfunded wallet fails simulation with the sidecar's
+ * "Swap simulation failed. AccountNotFound — check the inputs; if it
+ * persists the service may be degraded", which blames the inputs and the
+ * service for what is simply an empty pantry.
  */
-export async function transferPreflight(
+export async function fundsPreflight(
   meta: TokenMeta,
   amount: number,
   wallet?: string,
