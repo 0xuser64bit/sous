@@ -40,7 +40,7 @@ Health checks: `pnpm chain:health` (RPC slot) and `GET /api/health`.
 | `pnpm build` | production build |
 | `pnpm lint` | eslint |
 | `pnpm typecheck` | tsc --noEmit |
-| `pnpm test` | vitest unit suite (intent, shapes, tx, slot) |
+| `pnpm test` | vitest unit suite (intent, shapes, guard, fire path, tx, slot) |
 | `pnpm chain:health` | RPC slot check |
 
 ## How it works
@@ -54,14 +54,23 @@ See `docs/ARCHITECTURE.md` for the full flow and invariants. TL;DR:
   `src/app/api/mcp/route.ts` and `src/lib/mcp/client.ts`.
 - `src/app/api/tx/submit` — the single on-chain write path. Native
   `submit_signed_tx` first, direct-RPC fallback only when the sidecar is
-  down; expired quotes 409 and are never retried blindly.
+  down *and* the payload is routed `cookie-rpc`; expired quotes 409 and are
+  never retried blindly, and a submit that could not be confirmed returns
+  202 with its signature rather than losing it.
 - `src/lib/mcp/` — validated proxy client, mint resolver (exact-match or
   refuse), dual-aggregator quoting (cookiebox + cookiescan, survivor wins).
 - `src/lib/intent.ts` — local intent parser
   (swap/send/stake/limit/bridge/names/search). No network, no guessing with
   money.
+- `src/lib/pass/` — the order pipeline. `tickets.ts` turns an intent into
+  the exact `{tool, args}` that will become a transaction; `fire.ts` runs
+  quote → guard → wallet → relay, including the sidecar's bounded
+  `step:"intermediate"` continuation. No React in either, so the money path
+  is unit-tested.
 - `src/lib/tx/` — Nightly signing (transaction + message paths), typed
-  `TxError` (rejected/expired/failed), shared limit-cancel flow.
+  `TxError` (rejected/expired/failed), shared limit-cancel flow, and the
+  sign-guard. `src/lib/mcp/summary.ts` normalises every summary shape the
+  sidecar emits so the guard reads nested and flat payloads alike.
 - `src/components/terminal/` — chat pass, paper `QuoteTicket` per money
   move, `TxPass` stepper (`idle/quoting/awaiting_signature/sending/
   confirming/confirmed/failed`).
@@ -89,10 +98,26 @@ sidecar — point `MCP_HTTP_URL` at a hosted sidecar or the app degrades to
 honest per-action errors explaining the sidecar is down. Set env vars from
 `.env.example`. Wallet signing stays client-side via Nightly.
 
+## Verifying against a real sidecar
+
+The unit suite runs without one. To check shapes end to end:
+
+```bash
+COOKIE_SIGNER=external npx -y cookie-mcp --http 8787
+pnpm dev
+curl -s localhost:3000/api/mcp -H 'content-type: application/json' \
+  -d '{"tool":"chain_health","args":{}}'
+```
+
+`src/lib/__tests__/fixtures/sidecar.ts` holds payloads captured this way.
+When the sidecar's shapes change, re-capture them there — the tests are
+only worth anything if they describe the real protocol.
+
 ## Demo (60 seconds)
 
 1. Connect Nightly (show address).
-2. `Quote 10 COOK -> bCOOK` — ticket with venue + impact, fire in Nightly.
+2. `Quote 10 COOK -> bCOOK` — ticket shows the estimate, the guaranteed
+   minimum at the slippage cap, and both fees. Fire in Nightly.
 3. Approve — confirming (~1s) → confirmed + Cookiescan link.
 4. Pantry: stake 5 via quick-fire ticket; `Limit sell 5 bCOOK → COOK at
    2.0` → standing-orders board; scrap it.
@@ -106,7 +131,12 @@ honest per-action errors explaining the sidecar is down. Set env vars from
 - No bridge-status board yet (`bridge_status` is proxied, just not
   displayed).
 - No MomoSwap launchpad tab; no Baked Bazaar rewards.
-- `sous.cook` is unregistered (tier "long", ~1500 COOK as of 2026-09-19).
+- `sous.cook` is unregistered (tier "long", 15,000 COOK as of 2026-09-21).
+- `stake` and `unstake` return no itemised summary from the sidecar, so the
+  sign-guard has nothing to compare for those two; the ticket says so
+  instead of implying a check that did not run.
+- The rate limiter is per-instance memory. Behind more than one instance it
+  is a speed bump, not a quota.
 
 ## License
 
