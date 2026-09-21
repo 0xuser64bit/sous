@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { callMcp } from "@/lib/mcp/client";
-import { unwrapMcp, poolBoard, type DataRow } from "@/lib/mcp/shapes";
+import { unwrapMcp, poolBoard, type DataRow, type PoolRow } from "@/lib/mcp/shapes";
 import { pickKey, fmtNum } from "@/lib/utils/format";
 import { slotOf } from "@/lib/chain/slot";
 import { Section } from "@/components/layout/Section";
@@ -114,6 +114,46 @@ function SlotSparkline({ slot }: { slot: number | null }) {
 }
 
 /**
+ * Pool rows. The venue gets its own line because two pools can share a
+ * pair, and a single truncating line would hide exactly the word that
+ * tells them apart.
+ */
+function PoolBoard({ pools, more }: { pools: PoolRow[]; more: number }) {
+  return (
+    <div className="min-w-0">
+      <ul>
+        {pools.map((p) => (
+          <li key={p.id} className="flex min-w-0 items-baseline justify-between gap-3 py-1.5">
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[12.5px]" style={{ color: "var(--text-secondary)" }} title={p.pair}>
+                {p.pair}
+              </span>
+              {p.venue && (
+                <span
+                  className="block truncate font-mono text-[10.5px] uppercase tracking-[0.06em]"
+                  style={{ color: "var(--text-tertiary)" }}
+                  title={p.venue}
+                >
+                  {p.venue}
+                </span>
+              )}
+            </span>
+            <span className="shrink-0 font-mono text-[12.5px] tnum" style={{ color: "var(--text-primary)" }}>
+              {p.tvl}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {more ? (
+        <p className="pt-1 font-mono text-[10.5px]" style={{ color: "var(--text-tertiary)" }}>
+          +{more} more
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/**
  * The market board — chain pulse and pool listings. Ambient information
  * for context; the pass is where decisions happen.
  */
@@ -134,13 +174,12 @@ export function ActivityFeed() {
   });
 
   const healthPayload = health.data ? unwrapMcp(health.data) : null;
-  const poolPayload = pools.data ? unwrapMcp(pools.data) : null;
 
   const slot = health.data ? slotOf(health.data) : null;
   const live = slot !== null;
 
   const healthDetail = healthPayload ? healthRows(healthPayload) : [];
-  const board = poolPayload ? poolBoard(poolPayload, 5) : null;
+  const board = pools.data ? poolBoard(pools.data, 5) : null;
 
   return (
     <div className="flex min-w-0 flex-col">
@@ -180,8 +219,8 @@ export function ActivityFeed() {
             <RowsSkeleton lines={3} />
           ) : pools.isError ? (
             <RowsError message={sidecarHint(pools.error.message)} onRetry={() => void pools.refetch()} />
-          ) : board && board.rows.length ? (
-            <DataRows rows={board.rows} more={board.more} />
+          ) : board && board.pools.length ? (
+            <PoolBoard pools={board.pools} more={board.more} />
           ) : (
             <p className="text-[12.5px]" style={{ color: "var(--text-tertiary)" }}>
               No pools on the board.

@@ -49,6 +49,24 @@ export function trimAmount(v: string | number | undefined | null, dp = 6): strin
 }
 
 /**
+ * A dollar figure. Money reads in cents, not in whatever precision the
+ * source happened to carry — the pool board was printing "$1,220.0376"
+ * beside "$1,218.8105", four digits of noise on a difference nobody acts on.
+ * Large values compact so a busy pool does not blow out a narrow column.
+ */
+export function fmtUsd(v: unknown): string {
+  const n = typeof v === "string" ? Number(v) : (v as number);
+  if (typeof n !== "number" || !Number.isFinite(n)) return "—";
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000) return `$${fmtNum(n, 2)}`;
+  if (abs > 0 && abs < 0.01) return "<$0.01";
+  return `$${n.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+/**
  * A token balance, readable in a narrow column without lying about it.
  *
  * Amounts arrive as full-precision strings ("13639797.520541906") and a

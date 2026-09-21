@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseIntent } from "../intent";
+import { parseIntent, isTemplateOrder, EXAMPLE_ORDERS } from "../intent";
 
 describe("parseIntent", () => {
   it("parses arrow swaps with verbs", () => {
@@ -102,5 +102,24 @@ describe("parseIntent", () => {
     });
     expect(parseIntent("What is my balance?").kind).toBe("balance");
     expect(parseIntent("help").kind).toBe("help");
+  });
+});
+
+describe("isTemplateOrder", () => {
+  it("keeps examples that name a counterparty or price off the fire path", () => {
+    // alice.cook is not registered and 2.0 is nobody's price: tapping these
+    // should load the composer, not post a ticket addressed to a comment.
+    expect(isTemplateOrder("Send 2 COOK to alice.cook")).toBe(true);
+    expect(isTemplateOrder("Limit sell 5 bCOOK → COOK at 2.0")).toBe(true);
+    expect(isTemplateOrder("Bridge 5 COOK to solana")).toBe(true);
+  });
+  it("lets quotes and reads run on tap", () => {
+    expect(isTemplateOrder("Quote 10 COOK → bCOOK")).toBe(false);
+    expect(isTemplateOrder("What is my balance?")).toBe(false);
+  });
+  it("classifies every shipped example", () => {
+    for (const ex of EXAMPLE_ORDERS) {
+      expect(parseIntent(ex).kind).not.toBe("unknown");
+    }
   });
 });

@@ -250,10 +250,28 @@ export function parseIntent(input: string): Intent {
   return { kind: "unknown", raw: text };
 }
 
-/** Example orders shown on the empty pass (all verified against live pairs). */
+/**
+ * Example orders shown on the empty pass.
+ *
+ * The swap and balance examples name real Cookie Chain assets and run as
+ * typed. The send and limit examples are templates: `alice.cook` is not a
+ * registered name and 2.0 is not a price anyone chose — they exist to teach
+ * the syntax. `isTemplateOrder` keeps them out of the fire path.
+ */
 export const EXAMPLE_ORDERS = [
   "Quote 10 COOK → bCOOK",
   "Send 2 COOK to alice.cook",
   "Limit sell 5 bCOOK → COOK at 2.0",
   "What is my balance?",
 ] as const;
+
+/**
+ * True when an example names a counterparty or a price the user has to
+ * supply themselves. Tapping one of those should load the composer for
+ * editing, not post a ticket addressed to a name out of a code comment.
+ * Quotes and reads move nothing, so they run on tap.
+ */
+export function isTemplateOrder(text: string): boolean {
+  const kind = parseIntent(text).kind;
+  return kind === "transfer" || kind === "limit" || kind === "bridge";
+}

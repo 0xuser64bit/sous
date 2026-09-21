@@ -23,7 +23,7 @@ import {
 } from "@/lib/tx/signAndSend";
 import { cancelLimitOrder } from "@/lib/tx/cancelOrder";
 import { guardSummary, resolvedDestination } from "@/lib/tx/guard";
-import { parseIntent, EXAMPLE_ORDERS, type Intent } from "@/lib/intent";
+import { parseIntent, isTemplateOrder, EXAMPLE_ORDERS, type Intent } from "@/lib/intent";
 import { QuoteTicket } from "./QuoteTicket";
 import { SousMark } from "@/components/brand/SousMark";
 import { SousLoader } from "@/components/brand/SousLoader";
@@ -207,6 +207,27 @@ export function ChatPanel() {
     if (!el) return;
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, 132)}px`;
+  }
+
+  /**
+   * Tapping a suggestion. Quotes and reads run; anything naming a
+   * counterparty or a price loads the composer instead, because those
+   * examples are templates and the destination has to be the user's.
+   */
+  function onExampleTap(text: string) {
+    if (busy) return;
+    if (!isTemplateOrder(text)) {
+      void onSend(text);
+      return;
+    }
+    setInput(text);
+    const el = areaRef.current;
+    if (el) {
+      el.focus();
+      // Caret at the end so the destination is the first thing they edit.
+      el.setSelectionRange(text.length, text.length);
+      autosize();
+    }
   }
 
   async function onSend(raw?: string) {
@@ -840,8 +861,9 @@ export function ChatPanel() {
             {EXAMPLE_ORDERS.map((o) => (
               <button
                 key={o}
-                onClick={() => void onSend(o)}
+                onClick={() => onExampleTap(o)}
                 disabled={busy}
+                title={isTemplateOrder(o) ? "Loads the composer so you can edit it" : undefined}
                 className="min-h-[32px] shrink-0 rounded-full px-2.5 py-1 font-mono text-[10.5px] transition-colors disabled:opacity-40 lg:min-h-0 lg:text-[11px]"
                 style={{
                   background: "var(--bg-raised)",

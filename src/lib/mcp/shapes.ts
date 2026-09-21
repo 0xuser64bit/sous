@@ -1,4 +1,4 @@
-import { fmtBalance, fmtNum, pickKey, shortAddr, trimAmount } from "@/lib/utils/format";
+import { fmtBalance, fmtNum, fmtUsd, pickKey, shortAddr, trimAmount } from "@/lib/utils/format";
 
 /**
  * MCP responses arrive in different envelopes depending on transport
@@ -197,31 +197,51 @@ export function toRows(data: unknown, max = 8): { rows: DataRow[]; more: number 
   return { rows: [{ label: "result", value: str(data) }], more: 0 };
 }
 
+export type PoolRow = {
+  /** Stable key: several pools share a pair, and poolId is the only unique id. */
+  id: string;
+  pair: string;
+  venue?: string;
+  /** TVL already formatted as money, or "—". */
+  tvl: string;
+};
+
 /**
- * Pool board rows. Several pools share the same base/quote pair (e.g. two
- * bCOOK/wCOOK pools on different venues), so the venue rides in the label —
- * otherwise the board shows identical rows and React keys collide.
+ * Pool board rows.
+ *
+ * Several pools share the same base/quote pair — Cookie Chain currently
+ * lists two bCOOK/wCOOK pools on different venues — so the venue has to be
+ * shown to tell them apart. It gets its own line rather than being appended
+ * to the pair: in a 300px rail "bCOOK/wCOOK · COOKIESWAP CPAMM" truncates to
+ * "bCOOK/wCOOK · COOKIES…", which is exactly the ambiguity it was added to
+ * remove.
  */
-export function poolBoard(payload: unknown, max = 5): { rows: DataRow[]; more: number } {
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-    return { rows: [], more: 0 };
+export function poolBoard(payload: unknown, max = 5): { pools: PoolRow[]; more: number } {
+  const data = unwrapMcp(payload);
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    return { pools: [], more: 0 };
   }
-  const list = pickKey(payload as Record<string, unknown>, ["pools"]);
-  if (!Array.isArray(list)) return { rows: [], more: 0 };
-  const rows = list.slice(0, max).map((item): DataRow => {
+  const list = pickKey(data as Record<string, unknown>, ["pools"]);
+  if (!Array.isArray(list)) return { pools: [], more: 0 };
+  const pools = list.slice(0, max).map((item, i): PoolRow => {
     if (!item || typeof item !== "object" || Array.isArray(item)) {
-      return { label: "pool", value: "—" };
+      return { id: `pool-${i}`, pair: "pool", tvl: "—" };
     }
     const o = item as Record<string, unknown>;
-    const pair = pairLabel(o) ?? str(pickKey(o, ["poolId", "address", "id"]));
+    const id = pickKey(o, ["poolId", "address", "id"]);
+    const pair = pairLabel(o) ?? str(id);
     const venue = pickKey(o, ["venue"]);
-    const tvl = pickKey(o, ["tvlUsd", "tvl", "liquidityUsd"]);
+    const tvl = pickKey(o, ["tvlUsd", "liquidityUsd", "tvl"]);
     return {
-      label: typeof venue === "string" && venue ? `${pair} · ${venue}` : pair,
-      value: tvl === undefined || tvl === null ? "—" : str(tvl),
+      id: typeof id === "string" ? id : `pool-${i}`,
+      pair,
+      venue: typeof venue === "string" && venue ? venue : undefined,
+      // Six decimals of a dollar figure is noise, and an unlabelled number
+      // beside a COOK-denominated app reads as COOK.
+      tvl: typeof tvl === "number" ? fmtUsd(tvl) : "—",
     };
   });
-  return { rows, more: Math.max(0, list.length - max) };
+  return { pools, more: Math.max(0, list.length - max) };
 }
 
 /**

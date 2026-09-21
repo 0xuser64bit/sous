@@ -146,12 +146,14 @@ describe("poolBoard", () => {
         { poolId: "GHfz", venue: "COOKIEBOX DAMM", base: { symbol: "bCOOK" }, quote: { symbol: "wCOOK" }, tvlUsd: 900.1 },
       ],
     };
-    const { rows, more } = poolBoard(payload, 5);
-    expect(rows.map((r) => r.label)).toEqual([
-      "bCOOK/wCOOK · COOKIESWAP CPAMM",
-      "bCOOK/wCOOK · COOKIEBOX DAMM",
+    const { pools, more } = poolBoard(payload, 5);
+    // Same pair, different venue: the venue has to survive to tell them
+    // apart, and it gets its own line rather than a truncating suffix.
+    expect(pools).toEqual([
+      { id: "Dmzx", pair: "bCOOK/wCOOK", venue: "COOKIESWAP CPAMM", tvl: "$1,222.34" },
+      { id: "GHfz", pair: "bCOOK/wCOOK", venue: "COOKIEBOX DAMM", tvl: "$900.10" },
     ]);
-    expect(new Set(rows.map((r) => r.label)).size).toBe(rows.length);
+    expect(new Set(pools.map((p) => p.id)).size).toBe(pools.length);
     expect(more).toBe(0);
   });
 });
