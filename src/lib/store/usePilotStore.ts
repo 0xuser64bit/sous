@@ -38,8 +38,23 @@ export type QuoteData = {
   fireTool: McpTool;
   fireArgs: Record<string, unknown>;
   outAmount?: string;
+  /** Worst case the transaction can pay out, already formatted for display. */
+  minOutLabel?: string;
+  /** Aggregator's cut, already formatted — the network fee is not the only cost. */
+  aggFeeLabel?: string;
   venue?: string;
   impact?: string;
+
+  /* ── Sign-guard reference points ──────────────────────────────
+     Numeric copies of what the ticket promised. The sidecar re-quotes at
+     fire time, so the guard compares its answer against these before the
+     wallet opens. Absent means "not quoted" — never treat as zero. */
+  /** Expected output at quote time, in UI units. */
+  quotedOut?: number;
+  /** Guaranteed floor at quote time, in UI units. */
+  quotedMinOut?: number;
+  /** Slippage cap disclosed on the ticket, in basis points. */
+  slippageBps?: number;
   state: QuoteState;
   note?: string;
   /** Token-2022 transfer-hook caution shown prominently before signing. */

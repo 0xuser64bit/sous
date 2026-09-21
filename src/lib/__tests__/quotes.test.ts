@@ -72,6 +72,41 @@ describe("extractQuoteFields", () => {
   });
 });
 
+describe("quoteBoth economics", () => {
+  it("carries the floor, the venue's cut, and the slippage cap onto the view", async () => {
+    // These three are what a trader needs before signing and what the
+    // sign-guard later compares against; dropping them made the ticket read
+    // like a promise when it was an estimate.
+    vi.stubGlobal("fetch", vi.fn(async () => envelope(COOKIEBOX_QUOTE)));
+    const { best } = await quoteBoth({ inputMint: "a", outputMint: "b", amount: 10 });
+    expect(best.out).toBe("7.511801289"); // net of the aggregator fee
+    expect(best.grossOut).toBe("7.519320609");
+    expect(best.minOut).toBe("7.143354578");
+    expect(best.feeAmount).toBe("0.00751932");
+    expect(best.feeBps).toBe(10);
+    expect(best.slippageBps).toBe(500);
+  });
+
+  it("ranks venues on the net payout, not the gross estimate", async () => {
+    // A venue can advertise a bigger expectedOut and still pay less after
+    // its own fee. Ranking on gross would pick the worse fill.
+    const generousGross = {
+      ...COOKIEBOX_QUOTE,
+      aggregator: "cookiescan",
+      output: { ...COOKIEBOX_QUOTE.output, expectedOut: "99", outAfterFee: "1" },
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: unknown, init: unknown) => {
+        const body = JSON.parse(String((init as { body: string }).body));
+        return envelope(body.args.aggregator === "cookiebox" ? COOKIEBOX_QUOTE : generousGross);
+      }),
+    );
+    const { best } = await quoteBoth({ inputMint: "a", outputMint: "b", amount: 10 });
+    expect(best.aggregator).toBe("cookiebox");
+  });
+});
+
 describe("quoteBoth", () => {
   it("picks the better venue and keeps the loser", async () => {
     vi.stubGlobal(

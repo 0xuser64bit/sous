@@ -33,6 +33,8 @@ import {
   isAddressLike,
   trimAmount,
   pickKey,
+  bpsLabel,
+  numOrUndef,
 } from "@/lib/utils/format";
 import { unwrapMcp, toRows, balanceRows, balanceOf } from "@/lib/mcp/shapes";
 import { txUrl, addressUrl } from "@/lib/chain/explorer";
@@ -446,10 +448,25 @@ export function ChatPanel() {
       expectFrom: inMeta.mint,
       expectTo: outMeta.mint,
       outAmount: `${trimAmount(best.out)} ${outMeta.symbol}`,
+      // The estimate is not a promise: the floor is what the transaction
+      // guarantees, so it goes on the ticket next to the estimate.
+      minOutLabel: best.minOut
+        ? `${trimAmount(best.minOut)} ${outMeta.symbol}${
+            best.slippageBps !== undefined ? ` · ${bpsLabel(best.slippageBps)} slippage` : ""
+          }`
+        : undefined,
+      aggFeeLabel: best.feeAmount
+        ? `${trimAmount(best.feeAmount)} ${outMeta.symbol}${
+            best.feeBps !== undefined ? ` · ${bpsLabel(best.feeBps)}` : ""
+          }`
+        : undefined,
       venue: best.venue ? `${best.aggregator} · ${best.venue}` : best.aggregator,
       altQuote: alt ? `${alt.aggregator} ${trimAmount(alt.out)}` : undefined,
       impact: best.impact,
       warning: best.warnings?.join(" "),
+      quotedOut: numOrUndef(best.out),
+      quotedMinOut: numOrUndef(best.minOut),
+      slippageBps: best.slippageBps,
       fireTool: "trade",
       fireArgs: {
         inputMint: inMeta.mint,
@@ -539,14 +556,25 @@ export function ChatPanel() {
       return true;
     }
 
+    // The sidecar re-quotes at fire time: this is where what the user read
+    // and what the wallet is about to sign are compared for the last time.
     const check = guardSummary(payload.summary, q);
     if (!check.ok) {
       throw new TxError("failed", `Refused to sign — ${check.detail ?? "summary mismatch"}.`);
     }
+    if (!check.checked) {
+      // Never imply a comparison that did not happen. stake/unstake send no
+      // summary; the sidecar's own simulation is the only check there.
+      updateQuote(msgId, {
+        note: "Sidecar sent no itemised summary for this tool — read the wallet prompt itself.",
+      });
+    }
 
     setPhase("awaiting_signature");
     toast("Approve in Nightly", {
-      description: `${q.amount} ${q.from} → ${q.to} — check the amounts match.`,
+      description: q.minOutLabel
+        ? `${q.amount} ${q.from} → at least ${q.minOutLabel}`
+        : `${q.amount} ${q.from} → ${q.to} — check the amounts match.`,
     });
     const sig = await signAndSubmitNeedsSignature(payload, signTransaction!);
     setSignature(sig);

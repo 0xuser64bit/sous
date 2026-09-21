@@ -33,7 +33,23 @@ export function QuoteTicket({
   onFire: (msgId: string) => void;
   onDismiss: (msgId: string) => void;
 }) {
-  const { orderKind, amount, from, to, detailLabel, detail, altQuote, outAmount, venue, impact, state, note, warning } = quote;
+  const {
+    orderKind,
+    amount,
+    from,
+    to,
+    detailLabel,
+    detail,
+    altQuote,
+    outAmount,
+    minOutLabel,
+    aggFeeLabel,
+    venue,
+    impact,
+    state,
+    note,
+    warning,
+  } = quote;
   const dead = state === "fired" || state === "dismissed" || state === "failed";
 
   return (
@@ -62,7 +78,11 @@ export function QuoteTicket({
       {/* Line items — only the ones that mean something for this order kind. */}
       <dl className="space-y-1.5 px-3 py-3 text-[12.5px] sm:px-4">
         <Line label="You fire" value={`${amount} ${from}`} strong />
-        {outAmount && <Line label="You receive" value={outAmount} strong />}
+        {outAmount && <Line label="You receive" value={`≈ ${outAmount}`} strong />}
+        {/* The estimate above can move; this is the floor the transaction
+            actually enforces. It never hides behind a disclosure — signing
+            without reading it is the whole risk of a swap. */}
+        {minOutLabel && <Line label="At least" value={minOutLabel} strong />}
         {detail && detailLabel && <Line label={detailLabel} value={detail} />}
         {venue && <Line label="Venue" value={venue} />}
         {/* Venue proof lives here on desktop; on phones it folds into the
@@ -85,7 +105,10 @@ export function QuoteTicket({
             </div>
           </details>
         )}
-        <Line label="Est. fee" value={`≈ ${CHAIN_META.avgFeeCook} COOK`} />
+        {/* Two separate costs. The chain fee is negligible; the venue's cut
+            is not, and quoting only the first would understate the trade. */}
+        {aggFeeLabel && <Line label="Venue fee" value={aggFeeLabel} />}
+        <Line label="Network fee" value={`≈ ${CHAIN_META.avgFeeCook} COOK`} />
       </dl>
 
       {warning && (

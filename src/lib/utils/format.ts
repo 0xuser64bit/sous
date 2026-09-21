@@ -48,6 +48,20 @@ export function trimAmount(v: string | number | undefined | null, dp = 6): strin
   return truncated.toLocaleString("en-US", { maximumFractionDigits: dp });
 }
 
+/** Basis points as a percentage: 500 -> "5%", 10 -> "0.1%". */
+export function bpsLabel(bps: number): string {
+  if (!Number.isFinite(bps)) return "—";
+  const pct = bps / 100;
+  return `${pct.toLocaleString("en-US", { maximumFractionDigits: 2 })}%`;
+}
+
+/** Parse a sidecar numeric string, or undefined when it is not a number. */
+export function numOrUndef(v: unknown): number | undefined {
+  if (v === null || v === undefined || v === "") return undefined;
+  const n = typeof v === "string" ? Number(v.replace(/,/g, "")) : Number(v);
+  return Number.isFinite(n) ? n : undefined;
+}
+
 /** Best-effort pick of the first present key (case-insensitive). */
 export function pickKey(
   data: Record<string, unknown>,

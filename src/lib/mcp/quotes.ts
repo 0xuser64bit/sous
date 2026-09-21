@@ -13,10 +13,20 @@ export type Aggregator = "cookiebox" | "cookiescan";
 
 export type QuoteView = {
   aggregator: Aggregator;
-  /** UI amount the user receives (fee-in). */
+  /** What the user actually receives: net of the aggregator's cut. */
   out: string;
-  outAfterFee?: string;
+  /** Before that cut, when the venue reports both. */
+  grossOut?: string;
+  /**
+   * The least this swap can pay out at the quoted slippage cap. This is the
+   * only number the transaction actually guarantees — `out` is an estimate.
+   */
   minOut?: string;
+  /** Aggregator fee, denominated in the OUTPUT token, and its rate in bps. */
+  feeAmount?: string;
+  feeBps?: number;
+  /** Slippage cap encoded into the swap, in basis points. */
+  slippageBps?: number;
   venue?: string;
   impact?: string;
   /** Token-2022 transfer-hook cautions (one per hooked mint), if any. */
@@ -49,26 +59,45 @@ function numOrNull(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function outOf(raw: Record<string, unknown>): { out?: string; fee?: string; min?: string } {
+function outOf(raw: Record<string, unknown>): {
+  out?: string;
+  gross?: string;
+  min?: string;
+} {
   const o = pickKey(raw, ["output"]);
   const src = o && typeof o === "object" ? (o as Record<string, unknown>) : raw;
   const pick = (names: string[]) => {
     const v = pickKey(src, names);
     return v === undefined || v === null ? undefined : String(v);
   };
+  const gross = pick([
+    "expectedOut",
+    "expectedAmount",
+    "outAmount",
+    "outputAmount",
+    "amountOut",
+    "out",
+    "receivedAmount",
+    "toAmount",
+  ]);
+  // Quote the net figure whenever the venue reports one: the aggregator's cut
+  // comes out of the output, so `expectedOut` is not what lands in the wallet.
   return {
-    out: pick([
-      "outAfterFee",
-      "expectedOut",
-      "outAmount",
-      "outputAmount",
-      "amountOut",
-      "out",
-      "receivedAmount",
-      "toAmount",
-    ]),
-    fee: pick(["outAfterFee"]),
-    min: pick(["minOut", "minimumOut"]),
+    out: pick(["outAfterFee"]) ?? gross,
+    gross,
+    min: pick(["minOut", "minAmount", "minimumOut"]),
+  };
+}
+
+function feeOf(raw: Record<string, unknown>): { amount?: string; bps?: number } {
+  const f = pickKey(raw, ["aggregatorFee", "fee"]);
+  if (!f || typeof f !== "object" || Array.isArray(f)) return {};
+  const o = f as Record<string, unknown>;
+  const amount = pickKey(o, ["amount", "uiAmount"]);
+  const bps = numOrNull(pickKey(o, ["bps", "feeBps"]));
+  return {
+    amount: amount === undefined || amount === null ? undefined : String(amount),
+    bps: bps ?? undefined,
   };
 }
 
@@ -108,23 +137,26 @@ export function extractQuoteFields(raw: unknown): {
   };
 }
 
+/** Rank venues on what the user actually receives, not the gross estimate. */
 function scoreOf(v: QuoteView): number {
-  return (
-    numOrNull(v.outAfterFee) ?? numOrNull(v.out) ?? Number.NEGATIVE_INFINITY
-  );
+  return numOrNull(v.out) ?? Number.NEGATIVE_INFINITY;
 }
 
 function toView(aggregator: Aggregator, raw: unknown): QuoteView | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const o = raw as Record<string, unknown>;
-  const { out, fee, min } = outOf(o);
+  const { out, gross, min } = outOf(o);
   if (!out) return null;
   const f = extractQuoteFields(o);
+  const fee = feeOf(o);
   return {
     aggregator,
     out,
-    outAfterFee: fee,
+    grossOut: gross !== out ? gross : undefined,
     minOut: min,
+    feeAmount: fee.amount,
+    feeBps: fee.bps,
+    slippageBps: numOrNull(pickKey(o, ["slippageBps", "slippage_bps"])) ?? undefined,
     venue: f.venue,
     impact: f.impact,
     warnings: warningsOf(o),
