@@ -24,15 +24,20 @@ export function QuoteTicket({
   ticketNo,
   ts,
   quote,
+  canFire,
   onFire,
   onDismiss,
+  onConnect,
 }: {
   msgId: string;
   ticketNo?: number;
   ts: number;
   quote: QuoteData;
+  /** False until a wallet that can sign is connected. */
+  canFire: boolean;
   onFire: (msgId: string) => void;
   onDismiss: (msgId: string) => void;
+  onConnect: () => void;
 }) {
   const {
     orderKind,
@@ -136,13 +141,15 @@ export function QuoteTicket({
       {/* Actions */}
       {!dead && (
         <div className="flex gap-2 px-3 pb-4 pt-1 sm:px-4">
+          {/* Without a wallet the ticket is a dead end, so the primary
+              action becomes the way out of it rather than an error. */}
           <button
-            onClick={() => onFire(msgId)}
+            onClick={() => (canFire ? onFire(msgId) : onConnect())}
             disabled={state === "firing"}
             className="flex min-h-[44px] flex-1 items-center justify-center rounded-[var(--radius-sm)] px-3 py-2 text-[13px] font-semibold transition-opacity hover:opacity-85 disabled:opacity-50 sm:min-h-0"
             style={{ background: "var(--ink)", color: "var(--paper)" }}
           >
-            {state === "firing" ? "Firing…" : "Fire order"}
+            {state === "firing" ? "Firing…" : canFire ? "Fire order" : "Connect Nightly to fire"}
           </button>
           <button
             onClick={() => onDismiss(msgId)}

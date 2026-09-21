@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { callMcp, isNeedsSignature } from "@/lib/mcp/client";
@@ -128,6 +129,7 @@ const HELP_TEXT =
  */
 export function ChatPanel() {
   const { publicKey, signTransaction, signMessage } = useWallet();
+  const { setVisible: openWalletModal } = useWalletModal();
   const queryClient = useQueryClient();
   const messages = usePilotStore((s) => s.messages);
   const txPhase = usePilotStore((s) => s.txPhase);
@@ -227,7 +229,10 @@ export function ChatPanel() {
     try {
       switch (intent.kind) {
         case "swap":
-          if (!needWallet()) break;
+          // A quote is a read. The page promises browsing is free, and
+          // get_quote needs no wallet — gating it here made the one action
+          // worth showing a visitor the one they could not take. Firing the
+          // ticket still requires a signature.
           setPhase("quoting");
           await post(await buildSwapTicket(intent, wallet));
           setPhase("idle");
@@ -585,8 +590,10 @@ export function ChatPanel() {
               <Message
                 key={m.id}
                 msg={m}
+                canFire={Boolean(publicKey && signTransaction)}
                 onFire={onFire}
                 onDismiss={onDismiss}
+                onConnect={() => openWalletModal(true)}
               />
             ))
           )}
@@ -719,12 +726,16 @@ export function ChatPanel() {
 
 function Message({
   msg,
+  canFire,
   onFire,
   onDismiss,
+  onConnect,
 }: {
   msg: ChatMsg;
+  canFire: boolean;
   onFire: (id: string) => void;
   onDismiss: (id: string) => void;
+  onConnect: () => void;
 }) {
   if (msg.role === "user") {
     return (
@@ -774,8 +785,10 @@ function Message({
         ticketNo={msg.ticketNo}
         ts={msg.ts}
         quote={msg.quote}
+        canFire={canFire}
         onFire={onFire}
         onDismiss={onDismiss}
+        onConnect={onConnect}
       />
     );
   }
