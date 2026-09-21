@@ -8,12 +8,6 @@ export function isAddressLike(v: string): boolean {
   return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(v.trim());
 }
 
-export function fmtCook(lamportsLike: number | string, decimals = 9): string {
-  const n = Number(lamportsLike) / 10 ** decimals;
-  if (!Number.isFinite(n)) return "—";
-  return n.toLocaleString(undefined, { maximumFractionDigits: 4 });
-}
-
 /** Compact human number: 1_234_567 -> "1.23M". Never throws. */
 export function fmtNum(v: unknown, digits = 2): string {
   const n = typeof v === "string" ? Number(v) : (v as number);

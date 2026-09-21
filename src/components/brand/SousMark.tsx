@@ -1,5 +1,4 @@
 import Image from "next/image";
-import { cn } from "@/lib/utils/cn";
 
 export function SousMark({
   size = 36,
@@ -15,7 +14,7 @@ export function SousMark({
       width={size}
       height={size}
       priority
-      className={cn(className)}
+      className={className}
     />
   );
 }

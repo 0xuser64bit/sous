@@ -1,7 +1,7 @@
 import { callMcp } from "./client";
-import { unwrapMcp, str } from "./shapes";
+import { unwrapMcp } from "./shapes";
 import { pickKey, isAddressLike, shortAddr } from "@/lib/utils/format";
-import { NATIVE_COOK_MINT } from "@/lib/chain/config";
+import { BCOOK_MINT, NATIVE_COOK_MINT } from "@/lib/chain/config";
 
 export type TokenMeta = {
   /** Resolved mint address (or NATIVE_COOK_MINT for native COOK). */
@@ -16,11 +16,7 @@ export type TokenMeta = {
 const WELL_KNOWN: Record<string, TokenMeta> = {
   COOK: { mint: NATIVE_COOK_MINT, symbol: "COOK", native: true },
   WCOOK: { mint: NATIVE_COOK_MINT, symbol: "wCOOK", native: true },
-  BCOOK: {
-    mint: "EkPafx58mgwkEnGwo62jXhXDAdJ37Z8G8MFBRPsr9uhz",
-    symbol: "bCOOK",
-    native: false,
-  },
+  BCOOK: { mint: BCOOK_MINT, symbol: "bCOOK", native: false },
 };
 
 const mintCache = new Map<string, TokenMeta>();
@@ -114,13 +110,4 @@ export async function resolveMint(
   };
   mintCache.set(key, meta);
   return meta;
-}
-
-/** One-line candidate list for error messages. */
-export function candidatesOf(payload: unknown, max = 3): string {
-  const list = Array.isArray(payload) ? payload : [];
-  return list
-    .slice(0, max)
-    .map((h) => str(pickKey((h ?? {}) as Record<string, unknown>, ["symbol", "mint"])))
-    .join(", ");
 }
