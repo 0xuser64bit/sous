@@ -3,20 +3,8 @@ import { SousMark } from "@/components/brand/SousMark";
 import { DemoTheater } from "@/components/landing/DemoTheater";
 import { TicketLine } from "@/components/terminal/TicketLine";
 import { SAMPLE_TICKET as T } from "@/lib/landing/sampleTicket";
-import {
-  APP_TAGLINE,
-  CHAIN_META,
-  COOKIE_RPC_URL,
-  COOKIESCAN_BASE,
-} from "@/lib/chain/config";
-
-function rpcHost(): string {
-  try {
-    return new URL(COOKIE_RPC_URL).host;
-  } catch {
-    return COOKIE_RPC_URL;
-  }
-}
+import { ChainFooter } from "@/components/layout/ChainFooter";
+import { APP_TAGLINE, CHAIN_META } from "@/lib/chain/config";
 
 const HOW_ROWS = [
   {
@@ -343,24 +331,7 @@ export default function Landing() {
         </section>
       </main>
 
-      {/* ── Footer ─────────────────────────────────────────── */}
-      <footer style={{ borderTop: "1px solid var(--border-subtle)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
-        <div className="mx-auto flex w-full max-w-[1200px] flex-wrap items-center gap-x-4 gap-y-1 px-3 py-3 font-mono text-[10.5px] sm:px-4" style={{ color: "var(--text-tertiary)" }}>
-          <span className="min-w-0 truncate">
-            rpc <span style={{ color: "var(--text-secondary)" }}>{rpcHost()}</span>
-          </span>
-          <a
-            href={COOKIESCAN_BASE}
-            target="_blank"
-            rel="noreferrer"
-            className="flex min-h-[32px] shrink-0 items-center transition-opacity hover:opacity-70"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            cookiescan ↗
-          </a>
-          <span className="w-full sm:ml-auto sm:w-auto sm:text-right">fired in Nightly · settled on Cookie Chain</span>
-        </div>
-      </footer>
+      <ChainFooter />
     </div>
   );
 }
