@@ -1,9 +1,18 @@
 # One VM, two containers: the app (Next.js + cookie-mcp on loopback inside it)
-# and Caddy terminating TLS. The app publishes no ports — Caddy reaches it over
-# the compose network, so the only things on the public internet are 80/443.
+# and Caddy terminating TLS. The app also publishes 127.0.0.1:${SOUS_PORT}
+# (loopback only) so a shared host's system Caddy can route to it without a
+# second Caddy fighting over 80/443. On a fresh dedicated VM the docker Caddy
+# reaches the app over the compose network, so the only things on the public
+# internet are 80/443.
 services:
   app:
     build: .
+    ports:
+      # Loopback only. Dedicated-VM mode: unused (docker Caddy reaches the app
+      # over the compose network). Shared-host mode: the host's Caddy
+      # reverse_proxies 127.0.0.1:${SOUS_PORT} here, so no second Caddy can
+      # fight over 80/443.
+      - "127.0.0.1:${SOUS_PORT:-3100}:3000"
     environment:
       PORT: 3000
       SOLANA_RPC_URL: ${SOLANA_RPC_URL:-https://api.mainnet-beta.solana.com}

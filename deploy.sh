@@ -126,14 +126,73 @@ fi
 # ---------------------------------------------------------------- up
 say "Build and start"
 cd "$REPO_DIR"
+# SOUS_PORT is the loopback port the app publishes on. It only matters in
+# shared-host mode (below), but it is always kept in .env so re-runs reuse it.
+SOUS_PORT="${SOUS_PORT:-}"
+if [ -z "$SOUS_PORT" ] && [ -f .env ]; then
+  SOUS_PORT="$(grep -E '^SOUS_PORT=' .env | cut -d= -f2 | tail -n1 || true)"
+fi
+[ -n "$SOUS_PORT" ] || SOUS_PORT=3100
 if [ -f .env ] && grep -q '^SOUS_DOMAIN=' .env; then
   $SUDO sed -i "s|^SOUS_DOMAIN=.*|SOUS_DOMAIN=$DOMAIN|" .env
 else
   echo "SOUS_DOMAIN=$DOMAIN" >> .env
 fi
-ok "SOUS_DOMAIN=$DOMAIN"
-$SUDO docker compose up -d --build
-ok "containers up"
+if grep -q '^SOUS_PORT=' .env 2>/dev/null; then
+  $SUDO sed -i "s|^SOUS_PORT=.*|SOUS_PORT=$SOUS_PORT|" .env
+else
+  echo "SOUS_PORT=$SOUS_PORT" >> .env
+fi
+ok "SOUS_DOMAIN=$DOMAIN SOUS_PORT=$SOUS_PORT"
+
+# This VM may already host other sites behind a system-wide Caddy (port 80
+# taken). A second Caddy in docker cannot bind 80/443 then — the exact
+# "address already in use" failure. In that case run only the app container
+# (published on 127.0.0.1:$SOUS_PORT) and let the host Caddy route $DOMAIN
+# to it, instead of starting the docker Caddy.
+SHARED_MODE=0
+if $SUDO systemctl is-active --quiet caddy 2>/dev/null; then
+  SHARED_MODE=1
+elif $SUDO ss -tln 2>/dev/null | grep -qE ':80(\s|$)'; then
+  SHARED_MODE=1
+fi
+
+if [ "$SHARED_MODE" -eq 1 ]; then
+  say "Shared host detected (port 80 already bound) — using host Caddy"
+  $SUDO docker compose up -d --build app
+  # The compose file still defines a docker Caddy for fresh-VM use; make sure
+  # a stale one from an earlier run is not left behind to confuse anyone.
+  $SUDO docker compose stop caddy >/dev/null 2>&1 || true
+  $SUDO docker compose rm -f caddy >/dev/null 2>&1 || true
+  ok "app container up on 127.0.0.1:$SOUS_PORT"
+  say "Host Caddy ($DOMAIN -> 127.0.0.1:$SOUS_PORT)"
+  $SUDO python3 - "$DOMAIN" "$SOUS_PORT" <<'PYEOF'
+import re, sys
+domain, port = sys.argv[1], sys.argv[2]
+path = "/etc/caddy/Caddyfile"
+with open(path) as f:
+    src = f.read()
+block = "%s {\n\tencode gzip zstd\n\treverse_proxy 127.0.0.1:%s\n}\n" % (domain, port)
+# Replace an existing block for this domain, else append.
+pat = re.compile(r"(?m)^[ \t]*" + re.escape(domain) + r"[ \t]*\{.*?\n\}[ \t]*\n?", re.DOTALL)
+if pat.search(src):
+    src = pat.sub(block, src)
+else:
+    if not src.endswith("\n"):
+        src += "\n"
+    src += "\n" + block
+with open(path, "w") as f:
+    f.write(src)
+print("Caddyfile updated for %s" % domain)
+PYEOF
+  $SUDO caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null \
+    || die "host Caddyfile failed validation — fix /etc/caddy/Caddyfile and re-run"
+  $SUDO systemctl reload caddy
+  ok "host Caddy reloaded"
+else
+  $SUDO docker compose up -d --build
+  ok "containers up"
+fi
 
 # ---------------------------------------------------------------- verify
 say "Verify"
@@ -165,7 +224,16 @@ done
 
 printf '\n'
 warn "no answer on https://$DOMAIN after 2 minutes"
-cat <<EOF
+if [ "${SHARED_MODE:-0}" -eq 1 ]; then
+  cat <<EOF
+
+    Shared-host mode: the host Caddy serves this domain. Check:
+      sudo systemctl status caddy --no-pager | head -20
+      sudo journalctl -u caddy --since "10 min ago" --no-pager | tail -30
+      curl -s http://127.0.0.1:${SOUS_PORT}/api/health   (bypasses Caddy)
+EOF
+else
+  cat <<EOF
 
     Almost always Oracle's VCN Security List. Open it in the console:
       Networking > Virtual Cloud Networks > your VCN > Subnet > Security List
@@ -173,4 +241,5 @@ cat <<EOF
 
     Then check the cert:  sudo docker compose logs caddy | tail -30
 EOF
+fi
 exit 1
