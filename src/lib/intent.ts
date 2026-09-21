@@ -41,15 +41,23 @@ export type LimitIntent = {
   orderKind: "limit" | "stop";
 };
 
+export type BridgeIntent = {
+  kind: "bridge";
+  amount: number;
+  token: string;
+  /** Destination chain as typed: "solana", "cookie", or something we refuse. */
+  toChain: string;
+};
+
 export type Intent =
   | SwapIntent
   | TransferIntent
   | StakeIntent
   | UnstakeIntent
   | LimitIntent
+  | BridgeIntent
   | { kind: "cancel"; orderId: string }
   | { kind: "orders" }
-  | { kind: "bridge"; amount: number; token: string; toChain: string }
   | { kind: "resolve"; name: string }
   | { kind: "search"; query: string }
   | { kind: "balance" }

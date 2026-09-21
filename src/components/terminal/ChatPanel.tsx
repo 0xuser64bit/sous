@@ -4,25 +4,27 @@ import { useState, useRef, useEffect } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import {
-  callMcp,
-  isNeedsSignature,
-} from "@/lib/mcp/client";
-import { resolveMint, type TokenMeta } from "@/lib/mcp/tokens";
-import { quoteBoth } from "@/lib/mcp/quotes";
+import { callMcp, isNeedsSignature } from "@/lib/mcp/client";
 import {
   usePilotStore,
   type ChatMsg,
   type QuoteData,
   type TableData,
 } from "@/lib/store/usePilotStore";
-import {
-  signAndSubmitNeedsSignature,
-  signMessageNeedsSignature,
-  TxError,
-} from "@/lib/tx/signAndSend";
+import { TxError } from "@/lib/tx/signAndSend";
 import { cancelLimitOrder } from "@/lib/tx/cancelOrder";
-import { guardSummary, resolvedDestination } from "@/lib/tx/guard";
+import { resolvedDestination } from "@/lib/tx/guard";
+import { fireTicket } from "@/lib/pass/fire";
+import {
+  buildBridgeTicket,
+  buildLimitTicket,
+  buildStakeTicket,
+  buildSwapTicket,
+  buildTransferTicket,
+  buildUnstakeTicket,
+  transferPreflight,
+  type TicketDraft,
+} from "@/lib/pass/tickets";
 import { parseIntent, isTemplateOrder, EXAMPLE_ORDERS, type Intent } from "@/lib/intent";
 import { QuoteTicket } from "./QuoteTicket";
 import { SousMark } from "@/components/brand/SousMark";
@@ -31,22 +33,18 @@ import {
   shortAddr,
   fmtClock,
   isAddressLike,
-  trimAmount,
-  bpsLabel,
-  numOrUndef,
 } from "@/lib/utils/format";
 import {
   unwrapMcp,
   toRows,
   balanceRows,
-  balanceOf,
   stakeRows,
   limitOrderRows,
   domainRows,
   tokenSearchRows,
 } from "@/lib/mcp/shapes";
 import { txUrl, addressUrl } from "@/lib/chain/explorer";
-import { CHAIN_META, NATIVE_COOK_MINT } from "@/lib/chain/config";
+import { CHAIN_META } from "@/lib/chain/config";
 
 /** The ticket number of the most recent user order. */
 function lastTicketNo(): number | undefined {
@@ -119,21 +117,6 @@ function servedText(q: QuoteData, resolvedTo?: string | null): string {
     default:
       return `Served — ${q.amount} ${q.from} → ${q.to}.`;
   }
-}
-
-/** First address-looking string in a payload, one level deep. */
-function findAddress(v: unknown): string | null {
-  if (typeof v === "string") {
-    const t = v.trim();
-    return isAddressLike(t) ? t : null;
-  }
-  if (v && typeof v === "object" && !Array.isArray(v)) {
-    for (const val of Object.values(v as Record<string, unknown>)) {
-      const hit = findAddress(val);
-      if (hit) return hit;
-    }
-  }
-  return null;
 }
 
 const HELP_TEXT =
@@ -244,130 +227,38 @@ export function ChatPanel() {
     try {
       switch (intent.kind) {
         case "swap":
-          await runSwap(intent);
+          if (!needWallet()) break;
+          setPhase("quoting");
+          await post(await buildSwapTicket(intent, wallet));
+          setPhase("idle");
           break;
-        case "transfer": {
-          const meta = await resolveMint(intent.token, wallet);
-          const ticketId = proposeTicket({
-            orderKind: "transfer",
-            amount: intent.amount,
-            from: meta.symbol,
-            to: intent.to,
-            expectFrom: meta.mint,
-            fireTool: "transfer",
-            // Native COOK travels without `mint`; SPL needs it.
-            fireArgs: meta.native
-              ? { to: intent.to, amount: intent.amount }
-              : { to: intent.to, amount: intent.amount, mint: meta.mint },
-            note: "Review the destination — sends cannot be undone.",
-          });
-          // Non-blocking: warn on the ticket if the pantry can't cover it,
-          // so an empty wallet reads before signing, not after failing.
-          void preflightTransfer(ticketId, meta, intent.amount, wallet);
+        case "transfer":
+          await post(await buildTransferTicket(intent, wallet), intent.amount);
           break;
-        }
         case "stake":
+          // "stake" with no amount is a question about staking, not an order.
           if (intent.amount === null) await runStakeInfo();
-          else
-            await proposeTicket({
-              orderKind: "stake",
-              amount: intent.amount,
-              from: "COOK",
-              to: "bCOOK",
-              fireTool: "stake",
-              fireArgs: { amount: intent.amount },
-              note: "Liquid-staked via Cookiebox — you get bCOOK back.",
-            });
+          else await post(buildStakeTicket({ ...intent, amount: intent.amount }));
           break;
         case "unstake":
           if (intent.amount === null) {
             await runStakeInfo("How much should I unstake, Chef? e.g. “Unstake 5”.");
-          } else
-            await proposeTicket({
-              orderKind: "unstake",
-              amount: intent.amount,
-              from: "bCOOK",
-              to: "COOK",
-              fireTool: "unstake",
-              fireArgs: { amount: intent.amount },
-            });
+          } else {
+            await post(buildUnstakeTicket({ ...intent, amount: intent.amount }));
+          }
           break;
-        case "limit": {
-          const [inMeta, outMeta] = await Promise.all([
-            resolveMint(intent.from, wallet),
-            resolveMint(intent.to, wallet),
-          ]);
-          await proposeTicket({
-            orderKind: "limit",
-            amount: intent.amount,
-            from: inMeta.symbol,
-            to: outMeta.symbol,
-            expectFrom: inMeta.mint,
-            expectTo: outMeta.mint,
-            detailLabel: intent.orderKind === "stop" ? "Stop trigger" : "Limit price",
-            detail: `@ ${intent.price} ${outMeta.symbol} per ${inMeta.symbol}`,
-            fireTool: "place_limit_order",
-            fireArgs: {
-              inputMint: inMeta.mint,
-              outputMint: outMeta.mint,
-              amount: intent.amount,
-              price: intent.price,
-              kind: intent.orderKind,
-            },
-            note:
-              intent.orderKind === "stop"
-                ? "Stop-market: the keeper sells at market once the rate falls here."
-                : "Rests as a standing order until filled, cancelled, or expired.",
-          });
+        case "limit":
+          await post(await buildLimitTicket(intent, wallet));
           break;
-        }
+        case "bridge":
+          await post(await buildBridgeTicket(intent, { wallet, rawText: text }));
+          break;
         case "orders":
           await runOrders();
           break;
         case "cancel":
           await runCancel(intent.orderId);
           break;
-        case "bridge": {
-          // The warp route only speaks COOK, 1:1.
-          const meta = await resolveMint(intent.token, wallet);
-          if (!meta.native) {
-            push({
-              role: "assistant",
-              text: `The bridge only carries native COOK, Chef — ${meta.symbol} can't ride it. Swap to COOK first, then bridge.`,
-            });
-            break;
-          }
-          const direction = intent.toChain.startsWith("sol")
-            ? "cookie-to-solana"
-            : intent.toChain.startsWith("cook")
-              ? "solana-to-cookie"
-              : null;
-          if (!direction) {
-            push({
-              role: "assistant",
-              text: `I only see two ends of that bridge, Chef — “solana” or “cookie”. Where should the COOK land?`,
-            });
-            break;
-          }
-          const dest = findAddress(text);
-          await proposeTicket({
-            orderKind: "bridge",
-            amount: intent.amount,
-            from: "COOK",
-            to: intent.toChain,
-            expectFrom: NATIVE_COOK_MINT,
-            detailLabel: "Route",
-            detail: `Cookie Chain → ${intent.toChain}${dest ? ` · ${shortAddr(dest, 6)}` : ""}`,
-            fireTool: "bridge",
-            fireArgs: {
-              direction,
-              amount: intent.amount,
-              ...(dest ? { to: dest } : {}),
-            },
-            note: "Bridges settle on the far chain in minutes — slower than a swap.",
-          });
-          break;
-        }
         case "resolve":
           await runResolve(intent.name);
           break;
@@ -398,6 +289,25 @@ export function ChatPanel() {
     }
   }
 
+  /**
+   * Post whatever the ticket builder decided: a slip on the rail, or a
+   * sentence when the order cannot be built as asked. A transfer draft
+   * carries the token it resolved so the funds check can run behind the
+   * ticket rather than delaying it.
+   */
+  async function post(draft: TicketDraft, amount?: number) {
+    if (draft.kind === "say") {
+      push({ role: "assistant", text: draft.text });
+      return;
+    }
+    const id = proposeTicket(draft.quote);
+    if (draft.preflight && amount !== undefined) {
+      void transferPreflight(draft.preflight, amount, wallet).then((warning) => {
+        if (warning) updateQuote(id, { warning });
+      });
+    }
+  }
+
   /** Balances/orders/stake read stale the moment a fill lands — refetch them. */
   function refreshPantry() {
     void queryClient.invalidateQueries({ queryKey: ["balance"] });
@@ -425,91 +335,6 @@ export function ChatPanel() {
     });
   }
 
-  /**
-   * Funds preflight for transfer tickets. Runs after the ticket posts so it
-   * never delays the quote; attaches a warning when the pantry can't cover
-   * the send. Silent on any failure — fire-time simulation stays the
-   * backstop, this only moves the diagnosis earlier.
-   */
-  async function preflightTransfer(
-    msgId: string,
-    meta: TokenMeta,
-    amount: number,
-    wallet?: string,
-  ) {
-    if (!wallet) return;
-    try {
-      const res = await callMcp({ tool: "get_balance", wallet, args: { wallet } });
-      const bal = balanceOf(res, meta.symbol);
-      if (bal === null) return;
-      if (bal < amount) {
-        updateQuote(msgId, {
-          warning: `Light pantry — you hold ${trimAmount(bal)} ${meta.symbol}, but this fires ${amount}. It will fail simulation until you top up.`,
-        });
-      } else if (meta.native && bal - amount < 0.001) {
-        updateQuote(msgId, {
-          warning: `Nearly your whole balance — nothing stays for fees. Fire a touch less than ${trimAmount(bal)} ${meta.symbol}.`,
-        });
-      }
-    } catch {
-      /* sidecar hiccup — the ticket still fires and simulates normally */
-    }
-  }
-
-  async function runSwap(intent: { amount: number; from: string; to: string }) {
-    if (!needWallet()) return;
-    setPhase("quoting");
-    const [inMeta, outMeta] = await Promise.all([
-      resolveMint(intent.from, wallet),
-      resolveMint(intent.to, wallet),
-    ]);
-    const { best, alt } = await quoteBoth({
-      inputMint: inMeta.mint,
-      outputMint: outMeta.mint,
-      amount: intent.amount,
-      wallet,
-    });
-    proposeTicket({
-      orderKind: "swap",
-      amount: intent.amount,
-      from: inMeta.symbol,
-      to: outMeta.symbol,
-      expectFrom: inMeta.mint,
-      expectTo: outMeta.mint,
-      outAmount: `${trimAmount(best.out)} ${outMeta.symbol}`,
-      // The estimate is not a promise: the floor is what the transaction
-      // guarantees, so it goes on the ticket next to the estimate.
-      minOutLabel: best.minOut
-        ? `${trimAmount(best.minOut)} ${outMeta.symbol}${
-            best.slippageBps !== undefined ? ` · ${bpsLabel(best.slippageBps)} slippage` : ""
-          }`
-        : undefined,
-      aggFeeLabel: best.feeAmount
-        ? `${trimAmount(best.feeAmount)} ${outMeta.symbol}${
-            best.feeBps !== undefined ? ` · ${bpsLabel(best.feeBps)}` : ""
-          }`
-        : undefined,
-      venue: best.venue ? `${best.aggregator} · ${best.venue}` : best.aggregator,
-      altQuote: alt ? `${alt.aggregator} ${trimAmount(alt.out)}` : undefined,
-      impact: best.impact,
-      warning: best.warnings?.join(" "),
-      quotedOut: numOrUndef(best.out),
-      quotedMinOut: numOrUndef(best.minOut),
-      slippageBps: best.slippageBps,
-      fireTool: "trade",
-      fireArgs: {
-        inputMint: inMeta.mint,
-        outputMint: outMeta.mint,
-        amount: intent.amount,
-        aggregator: best.aggregator,
-      },
-      note: alt
-        ? `Best of two venues — the other quoted ${trimAmount(alt.out)}.`
-        : "Single venue answered — quoted alone.",
-    });
-    setPhase("idle");
-  }
-
   async function onFire(msgId: string) {
     const msg = usePilotStore.getState().messages.find((m) => m.id === msgId);
     if (!msg?.quote || busy) return;
@@ -520,18 +345,44 @@ export function ChatPanel() {
     setError(null);
     updateQuote(msgId, { state: "firing" });
     try {
-      // Some actions run in steps (e.g. bridge preflights): when the
-      // sidecar answers step:'intermediate', we call the original tool
-      // again to continue. Bounded so we never sign-loop.
-      for (let step = 0; step < 3; step++) {
-        const done = await fireOnce(msgId, q);
-        if (done) return;
-        updateQuote(msgId, {
-          state: "firing",
-          note: "First leg confirmed — firing the follow-up.",
-        });
+      const outcome = await fireTicket(q, {
+        wallet,
+        signTransaction: signTransaction!,
+        signMessage,
+        onPhase: setPhase,
+        onNote: (note) => updateQuote(msgId, { note }),
+        onSignature: setSignature,
+      });
+      refreshPantry();
+
+      switch (outcome.kind) {
+        case "filled":
+          updateQuote(msgId, { state: "fired", note: "Filled directly by the sidecar." });
+          push({ role: "assistant", text: servedText(q) });
+          break;
+        case "proof":
+          updateQuote(msgId, { state: "fired", note: "Message proof signed." });
+          push({
+            role: "assistant",
+            text: `Signed proof · ${shortAddr(outcome.signature, 6)} — hand it to whatever asked for it.`,
+          });
+          toast.success("Proof signed");
+          break;
+        case "pending":
+          updateQuote(msgId, { state: "fired", note: "Sent — confirmation still pending." });
+          push({ role: "assistant", text: outcome.note, signature: outcome.signature });
+          toast("Sent — still confirming", { description: shortAddr(outcome.signature, 6) });
+          break;
+        case "served":
+          updateQuote(msgId, { state: "fired" });
+          push({
+            role: "assistant",
+            text: servedText(q, resolvedDestination(outcome.summary)),
+            signature: outcome.signature,
+          });
+          toast.success(`Served · ${shortAddr(outcome.signature, 6)}`);
+          break;
       }
-      throw new TxError("failed", "Too many signing steps — stopped rather than loop.");
     } catch (e) {
       if (e instanceof TxError && e.code === "rejected") {
         setPhase("idle");
@@ -552,93 +403,6 @@ export function ChatPanel() {
 
   function onDismiss(msgId: string) {
     updateQuote(msgId, { state: "dismissed" });
-  }
-
-  /**
-   * One quote->guard->sign->submit round. Returns true when the ticket
-   * is done, false when the sidecar asked for an intermediate follow-up.
-   */
-  async function fireOnce(msgId: string, q: QuoteData): Promise<boolean> {
-    setPhase("quoting");
-    const res = await callMcp({ tool: q.fireTool, wallet, args: q.fireArgs });
-    if (!isNeedsSignature(res)) {
-      if (msgId) updateQuote(msgId, { state: "fired", note: "Filled directly by the sidecar." });
-      push({ role: "assistant", text: servedText(q) });
-      setPhase("idle");
-      refreshPantry();
-      return true;
-    }
-    const payload = res;
-
-    if (payload.kind === "message") {
-      if (!signMessage) throw new TxError("failed", "This wallet cannot sign messages.");
-      setPhase("awaiting_signature");
-      const text = payload.message ?? payload.next ?? q.fireTool;
-      const sig = await signMessageNeedsSignature(text, (bytes) => signMessage(bytes));
-      setPhase("idle");
-      if (msgId) updateQuote(msgId, { state: "fired", note: "Message proof signed." });
-      push({
-        role: "assistant",
-        text: `Signed proof · ${shortAddr(sig, 6)} — hand it to whatever asked for it.`,
-      });
-      toast.success("Proof signed");
-      return true;
-    }
-
-    // The sidecar re-quotes at fire time: this is where what the user read
-    // and what the wallet is about to sign are compared for the last time.
-    const check = guardSummary(payload.summary, q);
-    if (!check.ok) {
-      throw new TxError("failed", `Refused to sign — ${check.detail ?? "summary mismatch"}.`);
-    }
-    if (!check.checked) {
-      // Never imply a comparison that did not happen. stake/unstake send no
-      // summary; the sidecar's own simulation is the only check there.
-      updateQuote(msgId, {
-        note: "Sidecar sent no itemised summary for this tool — read the wallet prompt itself.",
-      });
-    }
-
-    setPhase("awaiting_signature");
-    toast("Approve in Nightly", {
-      description: q.minOutLabel
-        ? `${q.amount} ${q.from} → at least ${q.minOutLabel}`
-        : `${q.amount} ${q.from} → ${q.to} — check the amounts match.`,
-    });
-    const { signature: sig, confirmed, note } = await signAndSubmitNeedsSignature(
-      payload,
-      signTransaction!,
-    );
-    setSignature(sig);
-    if (payload.step === "intermediate") return false;
-
-    if (!confirmed) {
-      // Sent but unconfirmed. Claiming "Served" here would be a lie, and
-      // hiding the signature would leave the user unable to check at all.
-      setPhase("idle");
-      refreshPantry();
-      if (msgId) updateQuote(msgId, { state: "fired", note: "Sent — confirmation still pending." });
-      push({
-        role: "assistant",
-        text:
-          note ??
-          "Sent, but the chain had not confirmed it yet. Open the receipt on Cookiescan before re-firing.",
-        signature: sig,
-      });
-      toast("Sent — still confirming", { description: shortAddr(sig, 6) });
-      return true;
-    }
-
-    setPhase("confirmed");
-    refreshPantry();
-    if (msgId) updateQuote(msgId, { state: "fired" });
-    push({
-      role: "assistant",
-      text: servedText(q, resolvedDestination(payload.summary)),
-      signature: sig,
-    });
-    toast.success(`Served · ${shortAddr(sig, 6)}`);
-    return true;
   }
 
   async function runBalance() {
