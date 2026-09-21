@@ -209,7 +209,11 @@ describe("resolveMint", () => {
       "fetch",
       vi.fn(async () => envelope({ results: [{ symbol: "COOKHOUSE", mint: "33333333333333333333333333333333" }] })),
     );
-    await expect(resolveMint("cookh")).rejects.toThrow(/exact ticker/);
+    const err = await resolveMint("cookh").catch((e: Error) => e);
+    expect(String(err)).toMatch(/exact ticker/);
+    // Two mints can share a near-miss ticker as well, and "closest:
+    // COOKHOUSE, COOKHOUSE" is a riddle rather than a suggestion.
+    expect(String(err)).toMatch(/COOKHOUSE 333333…333333/);
   });
 
   it("keeps the native mint native when pasted as an address", async () => {

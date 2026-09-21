@@ -96,7 +96,9 @@ export async function resolveMint(
     );
   }
   if (!exact.length) {
-    const near = hits.slice(0, 3).map((h) => String(h.symbol ?? h.mint)).join(", ");
+    // Two mints can share a near-miss ticker too: "closest: COOKHOUSE,
+    // COOKHOUSE" is not a suggestion, it is a riddle. Describe each one.
+    const near = hits.slice(0, 3).map(describe).join(" · ");
     throw new Error(
       `No token has the exact ticker “${raw}”${near ? ` — closest: ${near}` : ""}. Use the exact ticker or a mint address.`,
     );
