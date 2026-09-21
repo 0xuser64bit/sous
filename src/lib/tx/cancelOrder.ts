@@ -14,18 +14,25 @@ export async function cancelLimitOrder(opts: {
     tx: T,
   ) => Promise<T>;
   onPhase?: (p: "quoting" | "awaiting_signature" | "confirming") => void;
-}): Promise<{ signature?: string; note: string }> {
+}): Promise<{ signature?: string; confirmed: boolean; note: string }> {
   opts.onPhase?.("quoting");
   const res = await callMcp({
     tool: "cancel_limit_order",
     wallet: opts.wallet,
     args: { order: opts.orderId },
   });
-  if (!isNeedsSignature(res)) return { note: "cancelled" };
+  if (!isNeedsSignature(res)) return { confirmed: true, note: "cancelled" };
   if (res.kind !== "transaction" || !res.transactionBase64) {
     throw new TxError("failed", "Unexpected cancel payload from sidecar.");
   }
   opts.onPhase?.("awaiting_signature");
-  const sig = await signAndSubmitNeedsSignature(res, opts.signTransaction);
-  return { signature: sig, note: "cancelled on-chain" };
+  const { signature, confirmed, note } = await signAndSubmitNeedsSignature(
+    res,
+    opts.signTransaction,
+  );
+  return {
+    signature,
+    confirmed,
+    note: confirmed ? "cancelled on-chain" : (note ?? "sent — confirmation pending"),
+  };
 }

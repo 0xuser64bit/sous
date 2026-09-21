@@ -75,14 +75,21 @@ export function StandingOrders() {
     if (!signTransaction || cancelling) return;
     setCancelling(id);
     try {
-      const { signature } = await cancelLimitOrder({
+      const { signature, confirmed, note } = await cancelLimitOrder({
         orderId: id,
         wallet,
         signTransaction,
       });
-      toast.success(
-        signature ? `Scrapped · ${shortAddr(signature, 6)}` : "Order cancelled",
-      );
+      if (!confirmed) {
+        // Unconfirmed is not cancelled: the order may still be resting.
+        toast("Sent — still confirming", {
+          description: signature ? `${shortAddr(signature, 6)} · ${note}` : note,
+        });
+      } else {
+        toast.success(
+          signature ? `Scrapped · ${shortAddr(signature, 6)}` : "Order cancelled",
+        );
+      }
       await queryClient.invalidateQueries({ queryKey: ["limit_orders", wallet] });
       // Scrapping frees locked funds — the balances board reads stale otherwise.
       await queryClient.invalidateQueries({ queryKey: ["balance"] });

@@ -576,9 +576,30 @@ export function ChatPanel() {
         ? `${q.amount} ${q.from} → at least ${q.minOutLabel}`
         : `${q.amount} ${q.from} → ${q.to} — check the amounts match.`,
     });
-    const sig = await signAndSubmitNeedsSignature(payload, signTransaction!);
+    const { signature: sig, confirmed, note } = await signAndSubmitNeedsSignature(
+      payload,
+      signTransaction!,
+    );
     setSignature(sig);
     if (payload.step === "intermediate") return false;
+
+    if (!confirmed) {
+      // Sent but unconfirmed. Claiming "Served" here would be a lie, and
+      // hiding the signature would leave the user unable to check at all.
+      setPhase("idle");
+      refreshPantry();
+      if (msgId) updateQuote(msgId, { state: "fired", note: "Sent — confirmation still pending." });
+      push({
+        role: "assistant",
+        text:
+          note ??
+          "Sent, but the chain had not confirmed it yet. Open the receipt on Cookiescan before re-firing.",
+        signature: sig,
+      });
+      toast("Sent — still confirming", { description: shortAddr(sig, 6) });
+      return true;
+    }
+
     setPhase("confirmed");
     refreshPantry();
     if (msgId) updateQuote(msgId, { state: "fired" });
@@ -664,21 +685,26 @@ export function ChatPanel() {
     setBusy(true);
     setError(null);
     try {
-      const { signature } = await cancelLimitOrder({
+      const { signature, confirmed, note } = await cancelLimitOrder({
         orderId,
         wallet,
         signTransaction: signTransaction!,
         onPhase: setPhase,
       });
-      if (signature) {
-        setSignature(signature);
-        setPhase("confirmed");
-        push({ role: "assistant", text: `Scrapped order ${orderId}.`, signature });
-      } else {
-        setPhase("idle");
-        push({ role: "assistant", text: `Scrapped order ${orderId}.` });
-      }
+      if (signature) setSignature(signature);
       refreshPantry();
+      if (!confirmed) {
+        setPhase("idle");
+        push({
+          role: "assistant",
+          text: `Cancel sent for order ${orderId}, not confirmed yet — ${note}`,
+          signature,
+        });
+        toast("Sent — still confirming");
+        return;
+      }
+      setPhase(signature ? "confirmed" : "idle");
+      push({ role: "assistant", text: `Scrapped order ${orderId}.`, signature });
       toast.success("Order cancelled");
     } catch (e) {
       if (e instanceof TxError && e.code === "rejected") {

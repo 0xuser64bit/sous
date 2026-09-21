@@ -4,6 +4,7 @@ import {
   createRateLimiter,
   upstreamAuthHeaders,
 } from "@/lib/server/guard";
+import { submitRouteOf } from "@/lib/server/submitRoute";
 
 const TOKEN_KEY = "MCP_AUTH_TOKEN";
 const savedToken = process.env[TOKEN_KEY];
@@ -58,5 +59,29 @@ describe("createRateLimiter", () => {
     expect(check("a", 1).ok).toBe(false);
     expect(check("b", 1).ok).toBe(true);
     expect(check("a", 60_000).ok).toBe(true);
+  });
+});
+
+describe("submitRouteOf", () => {
+  it("treats a missing hint as Cookie Chain", () => {
+    expect(submitRouteOf(undefined)).toEqual({ via: "cookie-rpc", canFallBackDirect: true });
+    expect(submitRouteOf({})).toEqual({ via: "cookie-rpc", canFallBackDirect: true });
+    expect(submitRouteOf("nonsense")).toEqual({ via: "cookie-rpc", canFallBackDirect: true });
+  });
+
+  it("refuses the direct fallback for routes it cannot speak", () => {
+    // Live: a bridge's first leg comes back { via: "solana-rpc" } with a
+    // Solana lastValidBlockHeight (~427,000,000) against Cookie Chain's
+    // ~25,900,000. Pushing those bytes at the Cookie RPC would fail on an
+    // unrecognisable blockhash and then mis-read the expiry check.
+    expect(submitRouteOf({ via: "solana-rpc" })).toEqual({
+      via: "solana-rpc",
+      canFallBackDirect: false,
+    });
+    expect(submitRouteOf({ via: "candyshop" }).canFallBackDirect).toBe(false);
+  });
+
+  it("allows the fallback on the route it does speak", () => {
+    expect(submitRouteOf({ via: "cookie-rpc" }).canFallBackDirect).toBe(true);
   });
 });

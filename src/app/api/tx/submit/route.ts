@@ -8,6 +8,7 @@ import {
   createRateLimiter,
   upstreamAuthHeaders,
 } from "@/lib/server/guard";
+import { submitRouteOf } from "@/lib/server/submitRoute";
 
 /**
  * POST /api/tx/submit { signedTx, submit?, blockhash?, lastValidBlockHeight?, what? }
@@ -137,12 +138,16 @@ async function submitViaSidecar(args: {
  * `confirmTransaction`, which opens a websocket subscription — the WS
  * endpoint is not guaranteed, and a dead socket would hang the request.
  * Cookie Chain finalises in ~1s, so a 1s poll clears almost immediately.
+ *
+ * Returns false when the deadline passed with the transaction neither
+ * confirmed nor provably dead. That is not a failure: the bytes are on the
+ * network and the caller owns a signature it must show the user.
  */
 async function confirmByPolling(
   conn: Connection,
   sig: string,
   lastValidBlockHeight?: number,
-): Promise<void> {
+): Promise<boolean> {
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
     const { value } = await conn.getSignatureStatuses([sig]);
@@ -151,7 +156,7 @@ async function confirmByPolling(
       if (st.err) {
         throw new Error(`Transaction failed on-chain: ${JSON.stringify(st.err).slice(0, 200)}`);
       }
-      if (st.confirmationStatus === "confirmed" || st.confirmationStatus === "finalized") return;
+      if (st.confirmationStatus === "confirmed" || st.confirmationStatus === "finalized") return true;
     } else if (typeof lastValidBlockHeight === "number") {
       // No status yet — if the chain has passed the quote's block window the
       // transaction can never land: report expiry rather than waiting it out.
@@ -162,21 +167,21 @@ async function confirmByPolling(
     }
     await new Promise((r) => setTimeout(r, 1000));
   }
-  throw new Error("confirmation timed out");
+  return false;
 }
 
 async function submitDirect(
   bytes: Buffer,
   lastValidBlockHeight?: number,
-): Promise<string> {
+): Promise<{ signature: string; confirmed: boolean }> {
   const conn = getConnection();
   const sig = await conn.sendRawTransaction(bytes, {
     skipPreflight: false,
     preflightCommitment: "confirmed",
     maxRetries: 2,
   });
-  await confirmByPolling(conn, sig, lastValidBlockHeight);
-  return sig;
+  const confirmed = await confirmByPolling(conn, sig, lastValidBlockHeight);
+  return { signature: sig, confirmed };
 }
 
 export async function POST(req: NextRequest) {
@@ -253,6 +258,8 @@ export async function POST(req: NextRequest) {
     typeof body.lastValidBlockHeight === "number" ? body.lastValidBlockHeight : undefined;
   const what = typeof body.what === "string" ? body.what : undefined;
 
+  const route = submitRouteOf(body.submit);
+
   // 1) Native sidecar path (knows the per-route submitter).
   try {
     const via = await submitViaSidecar({
@@ -264,10 +271,30 @@ export async function POST(req: NextRequest) {
     });
     if ("signature" in via) return NextResponse.json({ signature: via.signature });
     if ("transportError" in via) {
-      // 2) Sidecar unreachable — direct RPC fallback (same safety checks).
+      // 2) Sidecar unreachable. The fallback only speaks Cookie Chain, so a
+      //    transaction built for another route is reported, never guessed at.
+      if (!route.canFallBackDirect) {
+        return fail(
+          502,
+          `The sidecar is unreachable and this transaction is routed via ${route.via}, which only it can submit. Nothing was sent — start cookie-mcp and re-fire.`,
+        );
+      }
       try {
-        const sig = await submitDirect(bytes, lastValidBlockHeight);
-        return NextResponse.json({ signature: sig, via: "cookie-rpc-direct" });
+        const { signature, confirmed } = await submitDirect(bytes, lastValidBlockHeight);
+        if (!confirmed) {
+          // Sent but not yet seen. Losing the signature here is the worst
+          // possible outcome — the user cannot tell whether money moved.
+          return NextResponse.json(
+            {
+              signature,
+              pending: true,
+              via: "cookie-rpc-direct",
+              error: "Sent, but not confirmed within 30s. Check the signature on Cookiescan before re-firing.",
+            },
+            { status: 202 },
+          );
+        }
+        return NextResponse.json({ signature, via: "cookie-rpc-direct" });
       } catch (e) {
         const msg = e instanceof Error ? e.message : "submit failed";
         if (/already been processed|already processed|duplicate/i.test(msg)) {

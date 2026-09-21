@@ -38,7 +38,7 @@ describe("cancelLimitOrder", () => {
       wallet: "11111111111111111111111111111111",
       signTransaction: signTransaction as never,
     });
-    expect(out).toEqual({ note: "cancelled" });
+    expect(out).toEqual({ confirmed: true, note: "cancelled" });
     expect(signTransaction).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -68,8 +68,49 @@ describe("cancelLimitOrder", () => {
       signTransaction: (async (tx: never) => tx) as never,
       onPhase: (p) => phases.push(p),
     });
-    expect(out).toEqual({ signature: "SIG123", note: "cancelled on-chain" });
+    expect(out).toEqual({
+      signature: "SIG123",
+      confirmed: true,
+      note: "cancelled on-chain",
+    });
     expect(phases).toContain("awaiting_signature");
+  });
+
+  it("reports a sent-but-unconfirmed cancel instead of claiming success", async () => {
+    // The relay answers 202 when it sent the bytes but could not see them
+    // land. Losing the signature there would leave the user with no way to
+    // tell whether the order is still resting.
+    const needsSig = {
+      status: "needs_signature",
+      tool: "cancel_limit_order",
+      kind: "transaction",
+      transactionBase64: signedV0Base64(),
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: unknown) => {
+        if (String(url).includes("/api/tx/submit")) {
+          return new Response(
+            JSON.stringify({ signature: "SIG123", pending: true, error: "not confirmed in 30s" }),
+            { status: 202, headers: { "content-type": "application/json" } },
+          );
+        }
+        return mcpResult({
+          jsonrpc: "2.0",
+          id: 1,
+          result: { content: [{ text: JSON.stringify(needsSig) }] },
+        });
+      }),
+    );
+    const out = await cancelLimitOrder({
+      orderId: "abc",
+      signTransaction: (async (tx: never) => tx) as never,
+    });
+    expect(out).toEqual({
+      signature: "SIG123",
+      confirmed: false,
+      note: "not confirmed in 30s",
+    });
   });
 
   it("rejects malformed cancel payloads", async () => {

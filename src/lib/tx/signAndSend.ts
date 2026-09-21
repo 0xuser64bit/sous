@@ -41,6 +41,17 @@ function isRejection(e: unknown): boolean {
   return /reject|declined|denied|cancelled|canceled|dismissed|user.*(close|close)/i.test(m);
 }
 
+export type SubmitResult = {
+  signature: string;
+  /**
+   * False when the relay sent the bytes but could not confirm them in time.
+   * The transaction may still land: show the signature, never claim a fill.
+   */
+  confirmed: boolean;
+  /** Relay's explanation when `confirmed` is false. */
+  note?: string;
+};
+
 /**
  * Signs `transactionBase64` from cookie-mcp (external-signer mode) with the
  * user's Nightly wallet, then relays via POST /api/tx/submit which sends
@@ -56,7 +67,7 @@ export async function signAndSubmitNeedsSignature(
   signTransaction: <T extends Transaction | VersionedTransaction>(
     tx: T,
   ) => Promise<T>,
-): Promise<string> {
+): Promise<SubmitResult> {
   if (payload.kind !== "transaction" || !payload.transactionBase64) {
     throw new TxError("failed", "Unsupported signature payload (expected transaction).");
   }
@@ -127,6 +138,7 @@ export async function signAndSubmitNeedsSignature(
     signature?: string;
     error?: string;
     expired?: boolean;
+    pending?: boolean;
   } | null;
 
   if (!res.ok || !json?.signature) {
@@ -138,7 +150,11 @@ export async function signAndSubmitNeedsSignature(
     }
     throw new TxError("failed", json?.error ?? `Submit failed (${res.status}).`);
   }
-  return json.signature;
+  return {
+    signature: json.signature,
+    confirmed: json.pending !== true,
+    note: json.pending === true ? json.error : undefined,
+  };
 }
 
 /**
