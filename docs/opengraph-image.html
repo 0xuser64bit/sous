@@ -1,0 +1,65 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Geist+Mono:wght@400;600&family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:1200px;height:630px;overflow:hidden}
+  body{background:#141210;font-family:Geist,system-ui,sans-serif;display:flex;
+       align-items:center;gap:56px;padding:0 64px;position:relative}
+  body::after{content:"";position:absolute;left:0;right:0;bottom:0;height:5px;background:#c97a1b}
+  .left{flex:1;min-width:0}
+  .brand{display:flex;align-items:center;gap:14px;margin-bottom:38px}
+  .brand svg{width:54px;height:54px;flex:none}
+  .name{font-family:Fraunces,Georgia,serif;font-weight:600;font-size:38px;color:#e9e1d2;line-height:1}
+  .tag{font-size:11px;font-weight:600;letter-spacing:.15em;color:#a89a83;text-transform:uppercase;margin-top:5px}
+  h1{font-family:Fraunces,Georgia,serif;font-weight:600;font-size:60px;line-height:1.04;
+     letter-spacing:-.015em;color:#e9e1d2}
+  h1 em{font-style:normal;color:#c97a1b}
+  p{margin-top:22px;font-size:20px;line-height:1.5;color:#a89a83;max-width:30ch}
+  .meta{margin-top:38px;display:flex;gap:28px;font-family:"Geist Mono",monospace;font-size:13px;color:#6e6350}
+  .meta b{display:block;color:#c97a1b;font-weight:600;font-size:15px;margin-top:3px;font-feature-settings:"tnum"}
+  .url{margin-top:34px;font-family:"Geist Mono",monospace;font-size:17px;color:#c97a1b;letter-spacing:.01em}
+  /* paper ticket */
+  .ticket{width:404px;flex:none;background:#ece1cb;color:#221a10;border-radius:5px;
+          padding:24px 26px 30px;position:relative;font-feature-settings:"tnum"}
+  /* Clean perforation strip. A radial-gradient scallop renders as triangles
+     at this size in headless Chrome; repeating-linear is exact. */
+  .ticket::after{content:"";position:absolute;left:0;right:0;bottom:-6px;height:11px;
+    background:repeating-linear-gradient(90deg,#ece1cb 0 9px,transparent 9px 17px)}
+  .thead{display:flex;justify-content:space-between;font-family:"Geist Mono",monospace;
+         font-size:10px;font-weight:600;letter-spacing:.13em;color:#847252}
+  .pair{font-family:Fraunces,Georgia,serif;font-size:31px;font-weight:600;margin:12px 0 18px;letter-spacing:-.01em}
+  .row{display:flex;justify-content:space-between;align-items:baseline;
+       font-family:"Geist Mono",monospace;font-size:13px;padding:7px 0;border-top:1px solid rgba(34,26,16,.13)}
+  .row span:first-child{font-family:Geist,sans-serif;color:#57482f;font-size:13px}
+  .row b{font-weight:600}
+  .stamp{display:inline-block;margin-top:18px;border:1.5px solid #c97a1b;color:#8a5210;
+         border-radius:3px;padding:4px 11px;font-family:"Geist Mono",monospace;
+         font-size:11px;font-weight:600;letter-spacing:.13em}
+</style></head><body>
+<div class="left">
+  <div class="brand">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="41" r="17" fill="#C97A1B"/><circle cx="32" cy="41" r="17" fill="none" stroke="#8A5210" stroke-width="2"/><circle cx="25.5" cy="37" r="2.4" fill="#221A10"/><circle cx="35" cy="34.5" r="2" fill="#221A10"/><circle cx="38.5" cy="43.5" r="2.4" fill="#221A10"/><circle cx="29" cy="46" r="1.8" fill="#221A10"/><circle cx="32.5" cy="40.5" r="1.5" fill="#221A10"/><circle cx="48" cy="31" r="6.5" fill="#141210"/><g><circle cx="20.5" cy="15.5" r="6" fill="#ECE1CB"/><circle cx="32" cy="11.5" r="7" fill="#ECE1CB"/><circle cx="43.5" cy="15.5" r="6" fill="#ECE1CB"/><ellipse cx="32" cy="16.5" rx="13" ry="8" fill="#ECE1CB"/><rect x="21.5" y="19.5" width="21" height="8" rx="2" fill="#ECE1CB"/><rect x="21.5" y="24.5" width="21" height="3" fill="#C97A1B"/></g></svg>
+    <div><div class="name">Sous</div><div class="tag">Your sous-chef for Cookie Chain</div></div>
+  </div>
+  <h1>Order in words.<br><em>Sign in seconds.</em></h1>
+  <p>Every money move prints a ticket you read before the wallet ever opens.</p>
+  <div class="meta">
+    <div>FINALITY<b>~1s</b></div>
+    <div>AVG FEE<b>0.000005 COOK</b></div>
+    <div>SIGNER<b>Nightly</b></div>
+  </div>
+  <div class="url">sous.usevora.fun</div>
+</div>
+<div class="ticket">
+  <div class="thead"><span>ORDER NO. 004 · TASTING</span><span>14:32</span></div>
+  <div class="pair">10 COOK &#10230; bCOOK</div>
+  <div class="row"><span>You fire</span><b>10 COOK</b></div>
+  <div class="row"><span>You receive</span><b>&#8776; 7.480567 bCOOK</b></div>
+  <div class="row"><span>At least</span><b>7.120780 bCOOK</b></div>
+  <div class="row"><span>Venue</span><b>cookiebox</b></div>
+  <div class="row"><span>Network fee</span><b>&#8776; 0.000005 COOK</b></div>
+  <div class="stamp">SERVED &#10003;</div>
+</div>
+</body></html>

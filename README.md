@@ -115,8 +115,11 @@ docker run -p 3000:3000 -e PORT=3000 sous
 ```
 
 Any Dockerfile host works (Railway, Render, Fly). Set `SOLANA_RPC_URL` for
-the sidecar's bridge and `chain:"solana"` quotes; every other value in
-`.env.example` has a working default.
+the sidecar's bridge and `chain:"solana"` quotes, and `NEXT_PUBLIC_SITE_URL`
+to the origin you are serving from so link previews resolve their image
+(it is baked at build time, so it belongs in the build environment, not
+just the runtime one). Every other value in `.env.example` has a working
+default.
 
 Because the sidecar only listens on loopback, `/api/mcp` is the sole way in
 and its tool allowlist is the whole perimeter.

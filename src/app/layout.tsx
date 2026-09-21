@@ -20,7 +20,22 @@ const fraunces = Fraunces({
   weight: ["400", "500", "600"],
 });
 
+/**
+ * Absolute base for og:image and twitter:image. Without it Next resolves
+ * them against localhost, and a scraper fetching the card gets nothing —
+ * which is exactly how a shared link ends up with no preview.
+ *
+ * Empty-string env vars are real (a variable added without a value), and
+ * `??` does not catch them, so this validates rather than defaults — the
+ * same trap `lib/chain/config.ts` already documents.
+ */
+const SITE_URL = (() => {
+  const raw = (process.env.NEXT_PUBLIC_SITE_URL ?? "").trim();
+  return /^https?:\/\/.+/.test(raw) ? raw : "https://sous.usevora.fun";
+})();
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "Sous — Your sous-chef for Cookie Chain",
   description:
     "Fire swaps, stake, and limit orders on Cookie Chain in plain words. Quoted, signed in Nightly, served in ~1 second.",
@@ -31,9 +46,12 @@ export const metadata: Metadata = {
       "Fire swaps, stake, and limit orders on Cookie Chain in plain words. Quoted, signed in Nightly, served in ~1 second.",
     siteName: "Sous",
     type: "website",
+    url: SITE_URL,
   },
   twitter: {
-    card: "summary",
+    // The wide card. "summary" is the small square thumbnail, which wastes
+    // the one impression a link in a thread gets.
+    card: "summary_large_image",
     title: "Sous — Your sous-chef for Cookie Chain",
     description:
       "Fire swaps, stake, and limit orders on Cookie Chain in plain words. Quoted, signed in Nightly, served in ~1 second.",

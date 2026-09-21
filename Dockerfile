@@ -12,6 +12,15 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
 COPY . .
+
+# NEXT_PUBLIC_* is inlined into the bundle at build time, not read at run
+# time, so the public origin has to be known here. It only affects the
+# absolute og:image/twitter:image URLs; the default in layout.tsx is the
+# canonical deployment, and a fork overrides it with
+# `--build-arg NEXT_PUBLIC_SITE_URL=https://example.com`.
+ARG NEXT_PUBLIC_SITE_URL=""
+ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
+
 RUN pnpm build
 
 # Loopback only — /api/mcp is the sole way in, and it allowlists tools.
