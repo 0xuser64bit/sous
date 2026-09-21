@@ -28,7 +28,6 @@ export function StandingOrders() {
     queryFn: () =>
       callMcp({ tool: "get_limit_orders", wallet, args: { owner: wallet } }),
     enabled: Boolean(wallet),
-    retry: 1,
     staleTime: 20_000,
   });
 

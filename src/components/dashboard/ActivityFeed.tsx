@@ -5,7 +5,8 @@ import { useQuery } from "@tanstack/react-query";
 import { callMcp } from "@/lib/mcp/client";
 import { unwrapMcp, poolBoard, type DataRow, type PoolRow } from "@/lib/mcp/shapes";
 import { pickKey, fmtNum } from "@/lib/utils/format";
-import { slotOf } from "@/lib/chain/slot";
+import { statusDetail, statusLabel } from "@/lib/chain/status";
+import { useChainStatus } from "@/components/layout/useChainStatus";
 import { Section } from "@/components/layout/Section";
 import { DataRows, RowsSkeleton, RowsError, sidecarHint } from "@/components/layout/DataRows";
 
@@ -68,7 +69,10 @@ function SlotSparkline({ slot }: { slot: number | null }) {
     }
   }
 
-  if (hist.length < 2) {
+  // Two samples give one delta, and one delta makes the x-scale divide by
+  // zero: the polyline came out as "NaN,3.0" and the browser rejected the
+  // attribute. Wait for a second delta before drawing anything.
+  if (hist.length < 3) {
     return (
       <p className="font-mono text-[11px]" style={{ color: "var(--text-tertiary)" }}>
         warming up the line — watch a poll or two…
@@ -158,57 +162,65 @@ function PoolBoard({ pools, more }: { pools: PoolRow[]; more: number }) {
  * for context; the pass is where decisions happen.
  */
 export function ActivityFeed() {
-  const health = useQuery({
-    queryKey: ["chain_health"],
-    queryFn: () => callMcp({ tool: "chain_health", args: {} }),
-    refetchInterval: 15_000,
-    retry: 1,
-    staleTime: 10_000,
-  });
+  const { status, health: healthData, isPending: healthPending } = useChainStatus();
   const pools = useQuery({
     queryKey: ["pools"],
     queryFn: () => callMcp({ tool: "get_pools", args: {} }),
     refetchInterval: 30_000,
-    retry: 1,
     staleTime: 20_000,
   });
 
-  const healthPayload = health.data ? unwrapMcp(health.data) : null;
-
-  const slot = health.data ? slotOf(health.data) : null;
-  const live = slot !== null;
-
+  const healthPayload = healthData ? unwrapMcp(healthData) : null;
+  const live = status.state === "live";
   const healthDetail = healthPayload ? healthRows(healthPayload) : [];
   const board = pools.data ? poolBoard(pools.data, 5) : null;
 
   return (
     <div className="flex min-w-0 flex-col">
       <Section label="Chain">
-        {health.isPending ? (
+        {healthPending ? (
           <RowsSkeleton lines={2} />
-        ) : health.isError ? (
-          <RowsError message={sidecarHint(health.error.message)} onRetry={() => void health.refetch()} />
         ) : (
           <div className="flex min-w-0 flex-col gap-1">
             <div className="flex min-w-0 items-center gap-2 pb-1">
               <span
                 aria-hidden
                 className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${live ? "animate-live" : ""}`}
-                style={{ background: live ? "var(--success)" : "var(--text-tertiary)" }}
+                style={{
+                  background: live
+                    ? "var(--success)"
+                    : status.state === "unknown"
+                      ? "var(--text-tertiary)"
+                      : "var(--error)",
+                }}
               />
-              <span className="font-mono text-[12px] tnum" style={{ color: "var(--text-primary)" }}>
-                {live ? "Live" : "Quiet"}
+              <span
+                className="font-mono text-[12px] tnum"
+                style={{ color: live ? "var(--text-primary)" : "var(--error)" }}
+              >
+                {live ? "Live" : statusLabel(status)}
               </span>
-              {slot && (
+              {live && (
                 <span className="ml-auto min-w-0 truncate font-mono text-[12px] tnum" style={{ color: "var(--text-tertiary)" }}>
-                  slot {slot}
+                  {statusLabel(status)}
                 </span>
               )}
             </div>
+            {/* Name the fix, not just the symptom: a dead local process and a
+                dead chain look identical from inside the rail. */}
+            {!live && status.state !== "unknown" && (
+              <p className="pb-1 text-[11.5px] leading-relaxed" style={{ color: "var(--text-tertiary)" }}>
+                {statusDetail(status)}
+              </p>
+            )}
             {healthDetail.length > 0 && <DataRows rows={healthDetail} />}
-            <div className="pt-2">
-              <SlotSparkline slot={numSlot(slot)} />
-            </div>
+            {/* Nothing will arrive while the chain read is down, so the
+                "warming up" line would be a promise the app cannot keep. */}
+            {live && (
+              <div className="pt-2">
+                <SlotSparkline slot={numSlot(status.slot)} />
+              </div>
+            )}
           </div>
         )}
       </Section>

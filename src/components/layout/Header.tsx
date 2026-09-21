@@ -1,39 +1,37 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import { WalletButton } from "@/components/wallet/WalletButton";
 import { SousMark } from "@/components/brand/SousMark";
-import { callMcp } from "@/lib/mcp/client";
-import { slotOf } from "@/lib/chain/slot";
+import { statusDetail, statusLabel } from "@/lib/chain/status";
+import { useChainStatus } from "./useChainStatus";
 import { APP_TAGLINE } from "@/lib/chain/config";
 
 function ChainPulse() {
-  const { data } = useQuery({
-    queryKey: ["chain_health"],
-    queryFn: () => callMcp({ tool: "chain_health", args: {} }),
-    refetchInterval: 15_000,
-    retry: 1,
-    staleTime: 10_000,
-  });
-  const slot = slotOf(data);
-  const live = slot !== null;
+  const { status } = useChainStatus();
+  const live = status.state === "live";
 
   return (
     <div
       className="hidden items-center gap-2 sm:flex"
-      title={live ? `Cookie Chain slot ${slot}` : "Chain sidecar unreachable"}
+      title={statusDetail(status)}
       aria-live="polite"
     >
       <span
         aria-hidden
         className={`inline-block h-1.5 w-1.5 rounded-full ${live ? "animate-live" : ""}`}
-        style={{ background: live ? "var(--success)" : "var(--text-tertiary)" }}
+        style={{
+          background: live
+            ? "var(--success)"
+            : status.state === "unknown"
+              ? "var(--text-tertiary)"
+              : "var(--error)",
+        }}
       />
       <span
         className="font-mono text-[11px] tnum"
-        style={{ color: "var(--text-tertiary)" }}
+        style={{ color: live ? "var(--text-tertiary)" : "var(--error)" }}
       >
-        {live ? `slot ${slot}` : "offline"}
+        {statusLabel(status)}
       </span>
     </div>
   );
