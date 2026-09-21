@@ -128,6 +128,18 @@ const DOMAIN_RE = /\b([a-z0-9][a-z0-9-]*\.cook)\b/i;
 /** "search COOK", "find usdc", "token info bCOOK", "price of COOK" (no amount). */
 const SEARCH_RE = /\b(?:search|find|lookup|token\s+info|info|price\s+of)\s+\$?([a-z0-9.]{2,12})/i;
 
+/**
+ * Any verb that moves money. Used as a veto, not a matcher: when one of
+ * these is present but nothing below could parse an amount, the answer is
+ * "I couldn't read that" — never a read that quietly ignores the verb.
+ */
+const MONEY_VERB =
+  /\b(send|transfer|pay|swap|trade|convert|exchange|buy|sell|stak(?:e|ing)|unstak(?:e|ing)|bridge|limit|stop)\b/i;
+
+/** "what is my balance", "how much COOK do I have", "what do I hold". */
+const BALANCE_RE =
+  /\b(balance|balances|portfolio|holdings|pantry|my (?:cook|funds|money)|how much .* (?:do i have|do i hold)|what do i hold)\b/;
+
 export function parseIntent(input: string): Intent {
   const text = input.trim();
   const lower = text.toLowerCase();
@@ -136,18 +148,19 @@ export function parseIntent(input: string): Intent {
   if (/\b(help|what can you|how (do|does)|commands?)\b/.test(lower)) {
     return { kind: "help" };
   }
-  if (
-    /\b(balance|balances|portfolio|holdings|pantry|my (cook|funds|money))\b/.test(
-      lower,
-    )
-  ) {
+  // A money verb vetoes the balance read. "send all my cook to alice.cook"
+  // matched on "my cook" and came back as a balance, silently answering a
+  // transfer with a ledger — the one thing this parser promises never to do.
+  if (BALANCE_RE.test(lower) && !MONEY_VERB.test(lower)) {
     return { kind: "balance" };
   }
   if (/\bcancel\b/.test(lower)) {
     const m = text.match(CANCEL_RE);
     if (m && !CANCEL_STOPWORDS.has(m[1].toLowerCase()))
       return { kind: "cancel", orderId: m[1] };
-    return { kind: "unknown", raw: text };
+    // "cancel my order" names no id. Showing the book is the useful answer:
+    // every row there cancels with one tap.
+    return { kind: "orders" };
   }
   if (
     /\b(my\s+orders?|open\s+orders?|limit\s+orders?|my\s+limits?)\b/.test(lower) &&
@@ -248,6 +261,11 @@ export function parseIntent(input: string): Intent {
       return { kind: "swap", amount, from: token, to: "COOK" };
     }
   }
+
+  // Nothing above could parse it. If it still names a money verb, the user
+  // was trying to move funds and we failed to read the amount — say so,
+  // rather than falling through to a name lookup on the destination.
+  if (MONEY_VERB.test(lower)) return { kind: "unknown", raw: text };
 
   // Bare ".cook" mention with no resolve verb — still resolve it.
   if (domain) return { kind: "resolve", name: domain[1].toLowerCase() };
