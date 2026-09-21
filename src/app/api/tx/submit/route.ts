@@ -170,18 +170,42 @@ async function confirmByPolling(
   return false;
 }
 
-async function submitDirect(
+/**
+ * Send, then try to confirm. `conn` is a parameter so the one rule that
+ * matters here is testable without a chain.
+ *
+ * That rule: `sendRawTransaction` resolving is the point of no return. After
+ * it, the bytes are on the network and `sig` is the only way the user can
+ * ever learn what became of them — so nothing past that line may throw it
+ * away. confirmByPolling throws on three separate things (a chain-level
+ * failure, a passed block window, a plain RPC hiccup mid-poll) and each one
+ * used to escape with the signature still in a local, leaving the caller to
+ * answer 502 with nothing. A user told only "submit failed" re-fires, which
+ * is how a send becomes a double-send.
+ *
+ * Unconfirmed is not failure. It is "we could not tell", and it is reported
+ * with the signature and the reason attached.
+ */
+export async function submitDirect(
+  conn: Connection,
   bytes: Buffer,
   lastValidBlockHeight?: number,
-): Promise<{ signature: string; confirmed: boolean }> {
-  const conn = getConnection();
+): Promise<{ signature: string; confirmed: boolean; note?: string }> {
   const sig = await conn.sendRawTransaction(bytes, {
     skipPreflight: false,
     preflightCommitment: "confirmed",
     maxRetries: 2,
   });
-  const confirmed = await confirmByPolling(conn, sig, lastValidBlockHeight);
-  return { signature: sig, confirmed };
+  try {
+    const confirmed = await confirmByPolling(conn, sig, lastValidBlockHeight);
+    return { signature: sig, confirmed };
+  } catch (e) {
+    return {
+      signature: sig,
+      confirmed: false,
+      note: e instanceof Error ? e.message : "Could not confirm the transaction.",
+    };
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -280,7 +304,11 @@ export async function POST(req: NextRequest) {
         );
       }
       try {
-        const { signature, confirmed } = await submitDirect(bytes, lastValidBlockHeight);
+        const { signature, confirmed, note } = await submitDirect(
+          getConnection(),
+          bytes,
+          lastValidBlockHeight,
+        );
         if (!confirmed) {
           // Sent but not yet seen. Losing the signature here is the worst
           // possible outcome — the user cannot tell whether money moved.
@@ -289,7 +317,9 @@ export async function POST(req: NextRequest) {
               signature,
               pending: true,
               via: "cookie-rpc-direct",
-              error: "Sent, but not confirmed within 30s. Check the signature on Cookiescan before re-firing.",
+              error: note
+                ? `Sent, but could not be confirmed: ${note} Check the signature on Cookiescan before re-firing.`
+                : "Sent, but not confirmed within 30s. Check the signature on Cookiescan before re-firing.",
             },
             { status: 202 },
           );
