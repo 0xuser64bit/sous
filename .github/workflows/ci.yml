@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A second push to the same branch makes the first run's answer worthless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # pnpm before Node so setup-node can cache the pnpm store.
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          # cookie-mcp needs >= 22; matching it here keeps the app and the
+          # sidecar on one runtime.
+          node-version: 22
+          cache: pnpm
+
+      # --frozen-lockfile: CI must fail on a stale lockfile rather than
+      # quietly resolving something the author never ran.
+      - run: pnpm install --frozen-lockfile
+
+      # One command, the same one CONTRIBUTING tells a human to run, so the
+      # two can never drift.
+      - run: pnpm verify

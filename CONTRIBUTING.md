@@ -13,8 +13,11 @@ pnpm dev          # needs the MCP sidecar running (see README)
 ## Verify every change
 
 ```bash
-pnpm typecheck && pnpm lint && pnpm test && pnpm build
+pnpm verify    # typecheck + lint + test + build
 ```
+
+CI runs exactly this on every push and pull request, so a green local run
+means a green CI run.
 
 ## Rules that matter
 
@@ -27,6 +30,14 @@ pnpm typecheck && pnpm lint && pnpm test && pnpm build
   (`McpTool`).
 - All chain writes go through `POST /api/tx/submit`. Never retry an
   expired quote — surface the 409 and let the user re-fire.
-- Never sign when the sidecar summary contradicts the ticket; refuse loudly.
+- Never sign when the sidecar summary contradicts the ticket — in identity
+  (mints, amounts, destination) or in economics (output drift, the
+  guaranteed floor, the slippage cap). Refuse loudly.
+- Never resolve a ticker that two mints answer to, and never claim a fill
+  that was not confirmed.
+- Tests that touch a sidecar payload assert against
+  `src/lib/__tests__/fixtures/sidecar.ts`, captured from a live cookie-mcp.
+  Do not invent a shape — a guard tested against an imagined payload passed
+  every test while doing nothing on a real swap. Re-capture instead.
 - UI changes must follow `docs/DESIGN.md` (one copper accent, paper means
   money, tabular numbers, no shadows).

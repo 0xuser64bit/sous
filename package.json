@@ -10,6 +10,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
     "chain:health": "node scripts/chain-health.mjs"
   },
   "dependencies": {
