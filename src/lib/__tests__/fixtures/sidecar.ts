@@ -218,3 +218,38 @@ export function envelopeOf(payload: unknown) {
     result: { content: [{ type: "text", text: JSON.stringify(payload) }] },
   };
 }
+
+/**
+ * A real `needs_signature` reply, captured from a live cookie-mcp for
+ * `trade` 1 bCOOK -> COOK. This is the payload the browser must decode,
+ * hand to the wallet, and re-serialize — the one leg of the money path
+ * that no test could reach without it.
+ *
+ * Note the 64 zero bytes after the leading `01`: one signature slot, unset.
+ * The wallet fills it in. Anything that verifies signatures before the
+ * wallet has signed will choke on exactly this shape.
+ */
+export const NEEDS_SIGNATURE_TRADE = {
+  status: "needs_signature",
+  tool: "trade",
+  kind: "transaction",
+  what: "trade",
+  signer: WALLET_A,
+  version: "v0",
+  blockhash: "H9XitjGFx1Kp4qpWfwwmQLyBhGPwMbNixaMSHaUNiuki",
+  lastValidBlockHeight: 26022811,
+  submit: { via: "cookie-rpc" },
+  step: "final",
+  summary: {
+    aggregator: "cookiebox",
+    input: { mint: BCOOK_MINT, symbol: "bCOOK", amount: "1" },
+    output: {
+      mint: COOK_MINT,
+      symbol: "COOK",
+      expectedAmount: "1.324761814",
+      minAmount: "1.258523723",
+    },
+    slippageBps: 500,
+  },
+  transactionBase64: "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAQAJECANHQzy5PA0gfW29OntSWn23hecgU8l3cNO0tKvuhQ6xa0TK+naHc9OcJ1cGPd5Z9uq2dnsBob981ubXFm0VqFC9AltVzqZO2Ahp+I2OJVmQFcfWdQdS0iasrYsoLI36eMksJ+e0mlWrTCBpSDqPRPki4LHRihi1ANZMYGKGSGR4Y8cO2IG3ydHESMSivses664Otxe70d9wwBnL45lLi+e7d7Rd9TVtxYDQ8zW4LnTQWaHTfULLLSshlCOhIMB5p0NuQFoc+5SDEi2FviRJKSEIJX1GpigGi+FcSRq7JqTAwZGb+UhFzL/7K26csOb57yM5bvF9xJrLEObOkAAAACMlyWPTiSJ8bs9ECkUjg2DC1oTmdr/EIQEjnvY2+n4WcxFb83frASkAQKBPgDRfgjgRrrgfc4LJtiWl+JA35KpAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAG3fbh12Whk9nL4UbO63msHLSF7V9bN5E6jPWFfv8AqQabiFf+q4GE+2h/Y0YYwDXaxDncGus7VZig8AAAAAABtLF9EfhAJ66blBxGU4LIpmVNT7xl3lxsxHFt83SmLmdvk3RBXq67luQ064hkoVYjHrmTSaVJJwrpnuNXCBaH5NdcEJp2zBFT/LxieeyrKavd+7piHGV9r0qF5vjxw7L1S5aRToOr9bkpnbOh4J8cIh6mMG3ZrhSF7uDbhjJa14kHBwAFAsBcFQAIBgABAAkKCwEBCgIAAmQDAAAAIA0dDPLk8DSB9bb06e1JafbeF5yBTyXdw07S0q+6FDoIAAAAAAAAAEQ3YzQ1RWV38B0fAAAAAAClAAAAAAAAAAbd9uHXZaGT2cvhRs7reawctIXtX1s3kTqM9YV+/wCpCwICDCESIA0dDPLk8DSB9bb06e1JafbeF5yBTyXdw07S0q+6FDoNDg4DAQIEBQkMAAsLDQ8NGPjGnpHhdYfIAMqaOwAAAABLjANLAAAAAAsDAgAAAQkKAgAGDAIAAACzbSgAAAAAAAA=",
+} as const;
