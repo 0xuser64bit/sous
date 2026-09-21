@@ -50,7 +50,12 @@ function errText(e: unknown): string {
   if (e instanceof TxError && e.code === "expired") return e.message;
   const msg = e instanceof Error ? e.message : "Unknown error";
   if (/502|timeout|abort|fetch|network|sidecar|running\?/i.test(msg)) {
-    return `${msg} — Sidecar down? Run: COOKIE_SIGNER=external npx -y cookie-mcp --http 8787`;
+    // A transport failure is ours, not theirs. Telling a visitor to start a
+    // sidecar is advice they cannot act on — they have no terminal here, and
+    // the process is on our server. The dev hint stays for the dev build.
+    return process.env.NODE_ENV === "development"
+      ? `${msg} — Sidecar down? Run: COOKIE_SIGNER=external npx -y cookie-mcp --http 8787`
+      : "The kitchen is not answering — that is on our side, not yours. Nothing was charged; try again in a moment.";
   }
   return msg;
 }

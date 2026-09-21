@@ -121,14 +121,24 @@ export async function POST(req: NextRequest) {
       });
     }
   } catch (e) {
+    const dev = process.env.NODE_ENV === "development";
     const msg =
       e instanceof Error && e.name === "AbortError"
-        ? "MCP timeout — is cookie-mcp running? See README."
+        ? dev
+          ? "MCP timeout — is cookie-mcp running? See README."
+          : "The quoting service did not answer in time."
         : e instanceof Error
           ? e.message
           : "MCP proxy error";
     return NextResponse.json(
-      { error: msg, hint: "Run: COOKIE_SIGNER=external npx -y cookie-mcp --http 8787" },
+      {
+        error: msg,
+        // The hint reaches a browser. Only a developer can act on a shell
+        // command; in production it is noise that reads like a broken app.
+        hint: dev
+          ? "Run: COOKIE_SIGNER=external npx -y cookie-mcp --http 8787"
+          : "This is a problem on our side. Try again in a moment.",
+      },
       { status: 502 },
     );
   } finally {

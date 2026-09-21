@@ -41,11 +41,24 @@ describe("classifyChain", () => {
   it("blames the sidecar, not the chain, when the RPC still answers", () => {
     // Every read goes through the sidecar, so its death used to read as
     // "offline" — pointing the user at Cookie Chain when the thing that was
-    // down was a local process with a one-line fix.
+    // down was the quoting service.
     const s = classifyChain({ slot: null, sidecarFailed: true, rpcOk: true });
     expect(s.state).toBe("sidecar-down");
     expect(statusLabel(s)).toBe("sidecar down");
-    expect(statusDetail(s)).toMatch(/cookie-mcp --http 8787/);
+    expect(statusDetail(s)).toMatch(/quoting service/i);
+  });
+
+  it("never hands a deployed visitor a shell command", () => {
+    // NODE_ENV is "test" here, i.e. not "development", so these assert the
+    // string a real visitor sees. The dev build still names the command.
+    for (const s of [
+      classifyChain({ slot: null, sidecarFailed: true, rpcOk: true }),
+      classifyChain({ slot: null, sidecarFailed: true, rpcOk: false }),
+      classifyChain({ slot: null, sidecarFailed: true, rpcOk: null }),
+      classifyChain({ slot: "1", sidecarFailed: false, rpcOk: true }),
+    ]) {
+      expect(statusDetail(s)).not.toMatch(/npx|COOKIE_SIGNER|--http/);
+    }
   });
 
   it("reports the chain down only when neither answers", () => {

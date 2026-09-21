@@ -54,7 +54,12 @@ export function statusDetail(s: ChainStatus): string {
     case "live":
       return `Cookie Chain slot ${s.slot}`;
     case "sidecar-down":
-      return "Cookie Chain is answering, but cookie-mcp is not. Start it: COOKIE_SIGNER=external npx -y cookie-mcp --http 8787";
+      // Two audiences, one string. A visitor cannot start our sidecar, so
+      // naming the command only confuses them; a developer running locally
+      // wants exactly that command.
+      return process.env.NODE_ENV === "development"
+        ? "Cookie Chain is answering, but cookie-mcp is not. Start it: COOKIE_SIGNER=external npx -y cookie-mcp --http 8787"
+        : "Cookie Chain is answering, but our quoting service is not. Reads and fills are down until it returns.";
     case "chain-down":
       return "Neither the sidecar nor the Cookie Chain RPC is answering.";
     case "unknown":
