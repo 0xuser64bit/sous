@@ -606,11 +606,12 @@ export function ChatPanel() {
                   isTemplateOrder(o) ? `${o} — loads the composer so you can edit it` : undefined
                 }
                 title={isTemplateOrder(o) ? "Loads the composer so you can edit it" : undefined}
-                className="min-h-[32px] shrink-0 rounded-full px-2.5 py-1 font-mono text-[10.5px] transition-colors disabled:opacity-40 lg:min-h-0 lg:text-[11px]"
+                className="shrink-0 rounded-full px-2.5 py-1 font-mono text-[10.5px] transition-colors disabled:opacity-40 lg:text-[11px]"
                 style={{
                   background: "var(--bg-raised)",
                   border: "1px solid var(--border)",
                   color: "var(--text-secondary)",
+                  minHeight: "0px",
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.borderColor = "var(--copper-line)";
@@ -644,11 +645,9 @@ export function ChatPanel() {
                   void onSend();
                 }
               }}
-              placeholder={
-                publicKey ? "Order anything — “Quote 10 COOK → bCOOK”…" : "Connect Nightly, then order…"
-              }
+              placeholder={"Fire an order..."}
               disabled={busy}
-              className="max-h-[132px] min-w-0 flex-1 resize-none rounded-[var(--radius-md)] px-3 py-2.5 text-[13.5px] leading-relaxed outline-none transition-colors placeholder:text-[var(--text-tertiary)] disabled:opacity-50"
+              className="max-h-[132px] min-w-0 flex-1 resize-none rounded-[var(--radius-md)] px-3 py-1.5 text-[13.5px] leading-relaxed outline-none transition-colors placeholder:text-[var(--text-tertiary)] disabled:opacity-50"
               style={{
                 background: "var(--bg-inset)",
                 border: "1px solid var(--border)",
@@ -664,7 +663,7 @@ export function ChatPanel() {
             <button
               onClick={() => void onSend()}
               disabled={busy || !input.trim()}
-              className="flex min-h-[44px] shrink-0 items-center rounded-[var(--radius-md)] px-3 py-2.5 text-[13.5px] font-semibold transition-opacity disabled:opacity-30 lg:min-h-0 lg:px-4"
+              className="flex min-h-[44px] shrink-0 items-center rounded-[var(--radius-md)] px-3 py-1 text-[13.5px] font-semibold transition-opacity disabled:opacity-30 lg:min-h-0 lg:px-4"
               style={{ background: "var(--copper)", color: "#1d1206" }}
             >
               Fire
