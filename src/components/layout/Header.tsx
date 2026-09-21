@@ -12,7 +12,9 @@ function ChainPulse() {
 
   return (
     <div
-      className="hidden items-center gap-2 sm:flex"
+      // Quiet on a phone while everything works — but a dead sidecar has to
+      // be visible before the user discovers it by firing an order.
+      className={`${live ? "hidden sm:flex" : "flex"} items-center gap-2`}
       title={statusDetail(status)}
       aria-live="polite"
     >

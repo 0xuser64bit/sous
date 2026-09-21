@@ -13,8 +13,28 @@ Sous moves real money, so the trust boundary is explicit:
 - **Proxy hardening.** `/api/mcp` allowlists tools and validates
   wallet/body/args; `/api/tx/submit` caps body size, rate-limits, and
   returns 409 (never retry) on expired/duplicate submissions.
-- **Headers.** `next.config.ts` sets `nosniff`, `DENY` framing, and a strict
-  referrer policy.
+- **Headers.** `next.config.ts` sets `nosniff`, `DENY` framing, a strict
+  referrer policy, a `Permissions-Policy` denying camera/mic/geolocation/
+  payment/usb, `Cross-Origin-Opener-Policy: same-origin-allow-popups`, HSTS
+  in production, and `Cache-Control: no-store` on `/api/*` so balances never
+  land in a shared cache.
+- **CSP is partial, on purpose.** The policy sets `frame-ancestors 'none'`,
+  `object-src 'none'`, `base-uri 'self'` and `form-action 'self'`. It does
+  **not** constrain `script-src` or `connect-src`. Next's App Router inlines
+  its flight payload, so a strict `script-src` needs per-request nonces from
+  middleware and would force every page to render dynamically;
+  `'unsafe-inline'` would be a policy that looks strict and stops nothing.
+  `connect-src` stays open because the browser reaches the Cookie RPC
+  directly through the wallet adapter and each adapter calls its own
+  endpoints. Treat XSS as unmitigated by CSP here and rely on React's
+  escaping, the tool allowlist, and the sign-guard.
+- **The MCP proxy is unauthenticated.** Anyone who can reach `/api/mcp` can
+  ask the sidecar to build an unsigned transaction for any wallet address.
+  That leaks nothing signable — the browser wallet is the only signer — but
+  it does make a public deployment a free relay to your sidecar. The
+  allowlist keeps it to 17 read/build tools, and both routes are rate
+  limited per instance; put real auth in front of it before running this
+  anywhere that matters.
 - **Public env is public.** Anything under `NEXT_PUBLIC_*` ships to the
   browser — chain endpoints only, never secrets.
 

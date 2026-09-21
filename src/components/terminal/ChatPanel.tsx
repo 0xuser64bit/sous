@@ -589,6 +589,12 @@ export function ChatPanel() {
                 key={o}
                 onClick={() => onExampleTap(o)}
                 disabled={busy}
+                // `title` alone would REPLACE the accessible name, leaving a
+                // screen reader to announce the hint instead of the order.
+                // Name it with both, order first.
+                aria-label={
+                  isTemplateOrder(o) ? `${o} — loads the composer so you can edit it` : undefined
+                }
                 title={isTemplateOrder(o) ? "Loads the composer so you can edit it" : undefined}
                 className="min-h-[32px] shrink-0 rounded-full px-2.5 py-1 font-mono text-[10.5px] transition-colors disabled:opacity-40 lg:min-h-0 lg:text-[11px]"
                 style={{
