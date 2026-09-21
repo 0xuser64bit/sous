@@ -3,6 +3,8 @@
 import { useEffect, useReducer, useRef, useState } from "react";
 import { SousLoader } from "@/components/brand/SousLoader";
 import { CHAIN_META } from "@/lib/chain/config";
+import { TicketLine } from "@/components/terminal/TicketLine";
+import { SAMPLE_TICKET as T } from "@/lib/landing/sampleTicket";
 import {
   DEMO_CAPTIONS,
   DEMO_FINAL,
@@ -15,22 +17,6 @@ import {
 } from "@/lib/landing/demoScript";
 
 const STATIONS = ["Quoted", "Signature", "Confirming", "Served"] as const;
-
-function TicketLine({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
-  return (
-    <div className="flex items-baseline gap-2">
-      <dt className="shrink-0" style={{ color: "var(--ink-soft)" }}>{label}</dt>
-      <span aria-hidden className="leader mb-1 min-w-3 flex-1 sm:min-w-4" />
-      <dd
-        className={`min-w-0 max-w-[58%] truncate text-right font-mono tnum ${strong ? "font-semibold" : ""}`}
-        style={{ color: "var(--ink)" }}
-        title={value}
-      >
-        {value}
-      </dd>
-    </div>
-  );
-}
 
 /**
  * Demo theater: the 60-second flow as a canned, read-only loop.
@@ -145,7 +131,7 @@ export function DemoTheater() {
             >
               <div className="flex items-baseline justify-between gap-2 px-3 pt-3 sm:px-4">
                 <span className="min-w-0 truncate font-mono text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--ink-soft)" }}>
-                  Order No. 004 · Tasting
+                  Order No. {T.ticketNo} · Tasting
                 </span>
                 <span className="shrink-0 font-mono text-[10px] tnum" style={{ color: "var(--ink-faint)" }}>
                   14:32
@@ -153,14 +139,15 @@ export function DemoTheater() {
               </div>
               <div className="px-3 pb-1 pt-2 sm:px-4">
                 <p className="font-display break-words text-[20px] font-semibold leading-tight sm:text-[22px]">
-                  10 COOK <span style={{ color: "var(--ink-faint)" }}>→</span> bCOOK
+                  {T.amount} <span style={{ color: "var(--ink-faint)" }}>→</span> {T.to}
                 </p>
               </div>
               <dl className="space-y-1.5 px-3 py-3 text-[12.5px] sm:px-4">
-                <TicketLine label="You fire" value="10 COOK" strong />
-                <TicketLine label="You receive" value="9.982 bCOOK" strong />
-                <TicketLine label="Venue" value="Cookiebox · Candy Shop" />
-                <TicketLine label="Est. fee" value={`≈ ${CHAIN_META.avgFeeCook} COOK`} />
+                <TicketLine label="You fire" value={T.amount} strong />
+                <TicketLine label="You receive" value={`≈ ${T.receive}`} strong />
+                <TicketLine label="At least" value={T.minOut} strong />
+                <TicketLine label="Venue" value={T.venue} />
+                <TicketLine label="Network fee" value={`≈ ${CHAIN_META.avgFeeCook} COOK`} />
               </dl>
               {fired ? (
                 <div className="px-3 pb-3 sm:px-4">
@@ -232,7 +219,7 @@ export function DemoTheater() {
 
           {showReceipt && (
             <p className="animate-ticket-in text-[13.5px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-              Served — 10 COOK → bCOOK.{" "}
+              Served — {T.amount} → {T.to}.{" "}
               <span className="font-mono text-[12px] tnum" style={{ color: "var(--copper-bright)" }}>
                 4xQe…9vZm ↗
               </span>

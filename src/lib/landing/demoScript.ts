@@ -73,7 +73,7 @@ export const DEMO_CAPTIONS: DemoCaption[] = [
   },
   {
     title: "Quoted on paper",
-    text: "Venue, impact, fee — before signing.",
+    text: "Venue, floor, both fees — before signing.",
   },
   {
     title: "Signed in Nightly",

@@ -3,6 +3,7 @@
 import type { OrderKind, QuoteData } from "@/lib/store/usePilotStore";
 import { fmtClock } from "@/lib/utils/format";
 import { CHAIN_META } from "@/lib/chain/config";
+import { TicketLine as Line } from "./TicketLine";
 
 const KIND_WORD: Record<OrderKind, string> = {
   swap: "Tasting",
@@ -157,22 +158,6 @@ export function QuoteTicket({
       {/* Tear-off edge */}
       <div className="ticket-perf" aria-hidden style={{ ["--perf" as string]: "var(--bg-base)" }} />
     </article>
-  );
-}
-
-function Line({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
-  return (
-    <div className="flex items-baseline gap-2">
-      <dt className="shrink-0" style={{ color: "var(--ink-soft)" }}>{label}</dt>
-      <span aria-hidden className="leader mb-1 min-w-3 flex-1 sm:min-w-4" />
-      <dd
-        className={`min-w-0 max-w-[58%] truncate text-right font-mono tnum ${strong ? "font-semibold" : ""}`}
-        style={{ color: "var(--ink)" }}
-        title={value}
-      >
-        {value}
-      </dd>
-    </div>
   );
 }
 

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { SousMark } from "@/components/brand/SousMark";
 import { DemoTheater } from "@/components/landing/DemoTheater";
+import { TicketLine } from "@/components/terminal/TicketLine";
+import { SAMPLE_TICKET as T } from "@/lib/landing/sampleTicket";
 import {
   APP_TAGLINE,
   CHAIN_META,
@@ -20,13 +22,13 @@ const HOW_ROWS = [
   {
     n: "01",
     title: "Quoted on paper",
-    text: "Every money move arrives as an order slip: what you fire, what you receive, the venue that won, the impact, the fee. Two aggregators quote and the survivor wins — the loser stays on the ticket for honesty.",
+    text: "Every money move arrives as an order slip: what you fire, what you receive, and — separately — the least the transaction can pay out at its slippage cap. Both fees are named, the network's and the venue's. Two aggregators quote and the survivor wins; the loser stays on the ticket for honesty.",
     visual: "ticket" as const,
   },
   {
     n: "02",
     title: "Signed with confidence",
-    text: "The wallet opens only after a decoded summary is checked against your ticket — mints, not symbols. On any mismatch Sous refuses to sign instead of asking you to squint at hex.",
+    text: "The sidecar re-quotes when you fire, so the wallet opens only after its decoded summary is checked against the ticket you read — mints, not symbols, and the economics too. A price that drifted, a floor that dropped, a slippage cap that widened: Sous refuses instead of asking you to squint at hex.",
     visual: "guard" as const,
   },
   {
@@ -40,10 +42,11 @@ const HOW_ROWS = [
 const PROOF_ROWS = [
   { capability: "Nightly-first wallet, address always visible", trace: "WalletProviders.tsx · WalletButton.tsx" },
   { capability: "Paper ticket for every money move", trace: "QuoteTicket.tsx · usePilotStore.ts" },
-  { capability: "Decoded sign-guard, refuses on mismatch", trace: "ChatPanel.tsx guardSummary" },
-  { capability: "Single submit relay, blockhash-aware confirm", trace: "POST /api/tx/submit" },
+  { capability: "Decoded sign-guard: mints, amounts, floor, slippage", trace: "lib/tx/guard.ts · lib/mcp/summary.ts" },
+  { capability: "Single submit relay, route-aware, never drops a signature", trace: "POST /api/tx/submit" },
   { capability: "Phased expo strip plus Cookiescan receipt", trace: "TxPass.tsx · explorer.ts" },
   { capability: "Honest throughput line, no fake history", trace: "ActivityFeed.tsx" },
+  { capability: "Refuses a ticker two mints answer to", trace: "lib/mcp/tokens.ts resolveMint" },
 ] as const;
 
 const BOARD_ROWS = [
@@ -51,22 +54,6 @@ const BOARD_ROWS = [
   { item: "Bridge status board", need: "tool proxied, board pending" },
   { item: "Stop-loss trigger syntax", need: "needs sidecar order schema" },
 ] as const;
-
-function TicketLine({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
-  return (
-    <div className="flex items-baseline gap-2">
-      <dt className="shrink-0" style={{ color: "var(--ink-soft)" }}>{label}</dt>
-      <span aria-hidden className="leader mb-1 min-w-3 flex-1 sm:min-w-4" />
-      <dd
-        className={`min-w-0 max-w-[58%] truncate text-right font-mono tnum ${strong ? "font-semibold" : ""}`}
-        style={{ color: "var(--ink)" }}
-        title={value}
-      >
-        {value}
-      </dd>
-    </div>
-  );
-}
 
 export default function Landing() {
   return (
@@ -180,30 +167,32 @@ export default function Landing() {
               <figure className="animate-ticket-in mx-auto max-w-[420px]">
                 <div
                   role="img"
-                  aria-label="Example order ticket: 10 COOK to bCOOK, venue and fee listed, stamped Served"
+                  aria-label="Example order ticket: 10 COOK to bCOOK, showing the estimate, the guaranteed minimum, the venue and both fees, stamped Served"
                   className="overflow-hidden rounded-[var(--radius-md)]"
                   style={{ background: "var(--paper)", color: "var(--ink)" }}
                 >
                   <div aria-hidden="true">
                   <div className="flex items-baseline justify-between gap-2 px-3 pt-3 sm:px-4">
                     <span className="min-w-0 truncate font-mono text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--ink-soft)" }}>
-                      Order No. 004 · Tasting
+                      Order No. {T.ticketNo} · Tasting
                     </span>
                     <span className="shrink-0 font-mono text-[10px] tnum" style={{ color: "var(--ink-faint)" }}>
-                      14:32
+                      {T.clock}
                     </span>
                   </div>
                   <div className="px-3 pb-1 pt-2 sm:px-4">
                     <p className="font-display text-balance break-words text-[22px] font-semibold leading-tight sm:text-[26px]">
-                      10 COOK <span style={{ color: "var(--ink-faint)" }}>→</span> bCOOK
+                      {T.amount} <span style={{ color: "var(--ink-faint)" }}>→</span> {T.to}
                     </p>
                   </div>
                   <dl className="space-y-1.5 px-3 py-3 text-[12.5px] sm:px-4">
-                    <TicketLine label="You fire" value="10 COOK" strong />
-                    <TicketLine label="You receive" value="9.982 bCOOK" strong />
-                    <TicketLine label="Venue" value="Cookiebox · Candy Shop" />
-                    <TicketLine label="Price impact" value="0.02%" />
-                    <TicketLine label="Est. fee" value={`≈ ${CHAIN_META.avgFeeCook} COOK`} />
+                    <TicketLine label="You fire" value={T.amount} strong />
+                    <TicketLine label="You receive" value={`≈ ${T.receive}`} strong />
+                    <TicketLine label="At least" value={T.minOut} strong />
+                    <TicketLine label="Venue" value={T.venue} />
+                    <TicketLine label="Price impact" value={T.impact} />
+                    <TicketLine label="Venue fee" value={T.venueFee} />
+                    <TicketLine label="Network fee" value={`≈ ${CHAIN_META.avgFeeCook} COOK`} />
                   </dl>
                   <div className="px-3 pb-3 sm:px-4">
                     <span
@@ -382,23 +371,24 @@ function HowTicket() {
   return (
     <div
       role="img"
-      aria-label="Mini ticket showing venue compare: Cookiebox wins, Candy Shop also quoted"
+      aria-label="Mini ticket showing both venues quoted, the winner, and the guaranteed minimum"
       className="overflow-hidden rounded-[var(--radius-md)]"
       style={{ background: "var(--paper)", color: "var(--ink)" }}
     >
       <div aria-hidden="true">
       <div className="px-3 pt-3 sm:px-4">
         <p className="truncate font-mono text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--ink-soft)" }}>
-          Order No. 007 · Tasting
+          Order No. {T.ticketNo} · Tasting
         </p>
         <p className="font-display break-words pt-1 text-[18px] font-semibold leading-tight sm:text-[20px]">
-          25 COOK <span style={{ color: "var(--ink-faint)" }}>→</span> bCOOK
+          {T.amount} <span style={{ color: "var(--ink-faint)" }}>→</span> {T.to}
         </p>
       </div>
       <dl className="space-y-1.5 px-3 py-3 text-[12.5px] sm:px-4">
-        <TicketLine label="Best" value="Cookiebox · 24.94" strong />
-        <TicketLine label="Also quoted" value="Candy Shop · 24.91" />
-        <TicketLine label="Est. fee" value={`≈ ${CHAIN_META.avgFeeCook} COOK`} />
+        <TicketLine label="Best" value={`≈ ${T.receive}`} strong />
+        <TicketLine label="Also quoted" value={T.alsoQuoted} />
+        <TicketLine label="At least" value={T.minOut} strong />
+        <TicketLine label="Venue fee" value={T.venueFee} />
       </dl>
       <div className="ticket-perf" aria-hidden style={{ ["--perf" as string]: "var(--bg-base)" }} />
       </div>
